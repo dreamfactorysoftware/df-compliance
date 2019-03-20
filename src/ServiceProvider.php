@@ -1,0 +1,38 @@
+<?php
+
+namespace DreamFactory\Core\Compliance;
+
+use DreamFactory\Core\Compliance\Http\Middleware\HandleRestrictedAdmin;
+use Illuminate\Routing\Router;
+use Route;
+use Event;
+
+class ServiceProvider extends \Illuminate\Support\ServiceProvider
+{
+    /**
+     * @inheritdoc
+     */
+    public function boot()
+    {
+        $this->addMiddleware();
+    }
+
+
+    /**
+     * Register any middleware aliases.
+     *
+     * @return void
+     */
+    protected function addMiddleware()
+    {
+        // the method name was changed in Laravel 5.4
+        if (method_exists(Router::class, 'aliasMiddleware')) {
+            Route::aliasMiddleware('df.handle_restricted_admin', HandleRestrictedAdmin::class);
+        } else {
+            /** @noinspection PhpUndefinedMethodInspection */
+            Route::middleware('df.handle_restricted_admin', HandleRestrictedAdmin::class);
+        }
+
+        Route::pushMiddlewareToGroup('df.api', 'df.handle_restricted_admin');
+    }
+}

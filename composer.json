@@ -1,0 +1,38 @@
+{
+  "name":        "dreamfactory/df-compliance",
+  "description": "Data compliance configuration package for DreamFactory.",
+  "keywords":    [
+    "dreamfactory",
+    "compliance"
+  ],
+  "homepage":    "https://www.dreamfactory.com/",
+  "license":     "Apache-2.0",
+  "authors":     [
+    {
+      "name":  "Yaroslav Mokhurenko",
+      "email": "yaroslavmo@softwareplanet.uk.com"
+    }
+  ],
+  "support":     {
+    "email":  "dspsupport@dreamfactory.com",
+    "source": "https://github.com/dreamfactorysoftware/df-compliance",
+    "issues": "https://github.com/dreamfactorysoftware/df-compliance/issues",
+    "wiki":   "https://wiki.dreamfactory.com"
+  },
+  "require":     {
+    "dreamfactory/df-core":   "~0.14.0",
+    "dreamfactory/df-system": "~0.1.0"
+  },
+  "autoload":    {
+    "psr-4": {
+      "DreamFactory\\Core\\Compliance\\": "src/"
+    }
+  },
+  "extra":       {
+    "laravel":      {
+      "providers": [
+        "DreamFactory\\Core\\Compliance\\ServiceProvider"
+      ]
+    }
+  }
+}

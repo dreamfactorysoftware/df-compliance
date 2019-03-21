@@ -46,7 +46,8 @@ class HandleRestrictedAdmin
         return $route->hasParameter('service') &&
             $route->parameter('service') === 'system' &&
             $route->hasParameter('resource') &&
-            strpos($route->parameter('resource'), 'admin') !== false;
+            strpos($route->parameter('resource'), 'admin') !== false &&
+            strpos($route->parameter('resource'), 'session') === false;
     }
 
     /**

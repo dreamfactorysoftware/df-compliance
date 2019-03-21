@@ -17,6 +17,11 @@ class AccessibleTabs
      */
     function handle($request, Closure $next)
     {
+        // Ignore Restricted admin logic for non GOLD subscription
+        if(Environment::getLicenseLevel() !== LicenseLevel::GOLD) {
+            return $next($request);
+        };
+
         $response = $next($request);
         $route = $request->route();
         $method = $request->getMethod();

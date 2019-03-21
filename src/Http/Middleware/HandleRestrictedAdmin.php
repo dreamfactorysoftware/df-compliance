@@ -41,7 +41,7 @@ class HandleRestrictedAdmin
      * @param $route
      * @return bool
      */
-    private function isAdminRequest($route): bool
+    private function isAdminRequest($route)
     {
         return $route->hasParameter('service') &&
             $route->parameter('service') === 'system' &&
@@ -54,7 +54,7 @@ class HandleRestrictedAdmin
      * @param $action
      * @throws \Exception
      */
-    private function handleRestrictedAdmin($request, $action): void
+    private function handleRestrictedAdmin($request, $action)
     {
         if ($request->has('resource')) {
             $this->handleRequestWithResource($request, $action);
@@ -68,7 +68,7 @@ class HandleRestrictedAdmin
      * @param $action
      * @throws \Exception
      */
-    private function handleRequestWithResource($request, $action): void
+    private function handleRequestWithResource($request, $action)
     {
         $reqPayload = $request->input();
         foreach ($reqPayload['resource'] as $key => $item) {
@@ -82,7 +82,7 @@ class HandleRestrictedAdmin
      * @param $action
      * @throws \Exception
      */
-    private function handleRequestWithoutResource($request, $action): void
+    private function handleRequestWithoutResource($request, $action)
     {
         $request->replace($this->getUpdatedAdminData($action, $request->input()));
     }
@@ -93,7 +93,7 @@ class HandleRestrictedAdmin
      * @return array
      * @throws \Exception
      */
-    private function getUpdatedAdminData($action, $adminData): array
+    private function getUpdatedAdminData($action, $adminData)
     {
         //TODO: think about a better name, as this function delete update and create restricted admin role
         $isRestrictedAdmin = isset($adminData["is_restricted_admin"]) && $adminData["is_restricted_admin"];

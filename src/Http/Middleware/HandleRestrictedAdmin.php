@@ -4,6 +4,8 @@ namespace DreamFactory\Core\Compliance\Http\Middleware;
 
 use Closure;
 use DreamFactory\Core\Compliance\Components\RestrictedAdmin;
+use DreamFactory\Core\Utility\Environment;
+use DreamFactory\Core\Enums\LicenseLevel;
 
 class HandleRestrictedAdmin
 {

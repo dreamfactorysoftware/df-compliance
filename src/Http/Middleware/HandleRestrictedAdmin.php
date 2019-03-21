@@ -17,6 +17,11 @@ class HandleRestrictedAdmin
      */
     function handle($request, Closure $next)
     {
+        // Ignore Restricted admin logic for non GOLD subscription
+        if(Environment::getLicenseLevel() !== LicenseLevel::GOLD) {
+            return $next($request);
+        };
+
         $route = $request->route();
         $reqMethod = $request->getMethod();
         if ($this->isAdminRequest($route)) {

@@ -65,27 +65,26 @@ class HandleRestrictedAdmin
         $isResourceWrapped = isset($this->payload['resource']);
         if ($isResourceWrapped) {
             foreach ($this->payload['resource'] as $key => $adminData) {
-                $roleId = $this->handleAdminRole($adminData);
-                $this->payload['resource'][$key] = $this->getAdminData($adminData, $roleId);
+                $this->payload['resource'][$key] = $this->getPayloadDataWithHandledRole($adminData);
             }
         } else {
-            $roleId = $this->handleAdminRole($this->payload);
-            $this->payload = $this->getAdminData($this->payload, $roleId);
+            $this->payload = $this->getPayloadDataWithHandledRole($this->payload);
         }
         $this->request->replace($this->payload);
     }
 
     /**
-     * @param $data
+     * @param $requestData
      * @return integer
      * @throws \Exception
      */
-    private function handleAdminRole($data)
+    private function handleAdminRole($requestData)
     {
-        $isRestrictedAdmin = $this->isRestrictedAdmin($data);
-        $accessByTabs = $this->getAccessTabs($data);
-        $restrictedAdminHelper = new RestrictedAdmin($data["email"], $accessByTabs);
+        $isRestrictedAdmin = $this->isRestrictedAdmin($requestData);
+        $accessByTabs = $this->getAccessTabs($requestData);
+        $restrictedAdminHelper = new RestrictedAdmin($requestData["email"], $accessByTabs);
         $notAllTabsSelected = !RestrictedAdmin::isAllTabs($accessByTabs);
+
         switch ($this->method) {
             case 'POST':
                 {
@@ -109,40 +108,51 @@ class HandleRestrictedAdmin
     }
 
     /**
-     * @param $data
+     * @param $requestData
      * @param $roleId
      * @return array
      */
-    private function getAdminData($data, $roleId)
+    private function getAdminData($requestData, $roleId)
     {
-        $isRestrictedAdmin = $this->isRestrictedAdmin($data);
-        $accessByTabs = $this->getAccessTabs($data);
+        $isRestrictedAdmin = $this->isRestrictedAdmin($requestData);
+        $accessByTabs = $this->getAccessTabs($requestData);
         $notAllTabsSelected = !RestrictedAdmin::isAllTabs($accessByTabs);
         if ($isRestrictedAdmin && $notAllTabsSelected) {
-            $restrictedAdminHelper = new RestrictedAdmin($data["email"], $accessByTabs, $roleId);
+            $restrictedAdminHelper = new RestrictedAdmin($requestData["email"], $accessByTabs, $roleId);
 
             // Links new role with admin via adding user_to_app_to_role_by_user_id array to request body
-            $adminId = isset($data["id"]) ? $data["id"] : 0;
-            $data["user_to_app_to_role_by_user_id"] = $restrictedAdminHelper->getUserAppRoleByUserId($isRestrictedAdmin, $adminId);
+            $adminId = isset($requestData["id"]) ? $requestData["id"] : 0;
+            $requestData["user_to_app_to_role_by_user_id"] = $restrictedAdminHelper->getUserAppRoleByUserId($isRestrictedAdmin, $adminId);
         }
-        return $data;
+        return $requestData;
     }
 
     /**
-     * @param $data
+     * @param $requestData
      * @return bool
      */
-    private function isRestrictedAdmin($data)
+    private function isRestrictedAdmin($requestData)
     {
-        return isset($data["is_restricted_admin"]) && $data["is_restricted_admin"];
+        return isset($requestData["is_restricted_admin"]) && $requestData["is_restricted_admin"];
     }
 
     /**
-     * @param $data
+     * @param $requestData
      * @return array
      */
-    private function getAccessTabs($data)
+    private function getAccessTabs($requestData)
     {
-        return isset($data["access_by_tabs"]) ? $data["access_by_tabs"] : [];
+        return isset($requestData["access_by_tabs"]) ? $requestData["access_by_tabs"] : [];
+    }
+
+    /**
+     * @param $requestData
+     * @return array
+     * @throws \Exception
+     */
+    private function getPayloadDataWithHandledRole($requestData)
+    {
+        $roleId = $this->handleAdminRole($requestData);
+        return $this->getAdminData($requestData, $roleId);
     }
 }

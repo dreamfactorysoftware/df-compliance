@@ -11,6 +11,7 @@ use DreamFactory\Core\Exceptions\ForbiddenException;
 class HandleRestrictedAdmin
 {
 
+    // Request methods restricted admin logic use
     const RESTRICTED_ADMIN_METHODS = ['POST', 'PUT', 'PATCH'];
 
     private $method;
@@ -44,6 +45,8 @@ class HandleRestrictedAdmin
     }
 
     /**
+     * Is request goest to system/admin/* endpoint (except system/admin/session)
+     *
      * @return bool
      */
     private function isRestrictedAdminRequest()
@@ -57,6 +60,8 @@ class HandleRestrictedAdmin
     }
 
     /**
+     * Replace request payload with restricted admin role linked to the admin
+     *
      * @return void
      * @throws \Exception
      */
@@ -74,6 +79,20 @@ class HandleRestrictedAdmin
     }
 
     /**
+     * @param $requestData
+     * @return array
+     * @throws \Exception
+     */
+    private function getPayloadDataWithHandledRole($requestData)
+    {
+        $roleId = $this->handleAdminRole($requestData);
+        return $this->getAdminData($requestData, $roleId);
+    }
+
+
+    /**
+     * Create, update or delete restricted admin role
+     *
      * @param $requestData
      * @return integer
      * @throws \Exception
@@ -108,6 +127,8 @@ class HandleRestrictedAdmin
     }
 
     /**
+     * Add user_to_app_to_role_by_user_id array to the admin data from request to link Role with the Admin
+     *
      * @param $requestData
      * @param $roleId
      * @return array
@@ -117,6 +138,7 @@ class HandleRestrictedAdmin
         $isRestrictedAdmin = $this->isRestrictedAdmin($requestData);
         $accessByTabs = $this->getAccessTabs($requestData);
         $notAllTabsSelected = !RestrictedAdmin::isAllTabs($accessByTabs);
+
         if ($isRestrictedAdmin && $notAllTabsSelected) {
             $restrictedAdminHelper = new RestrictedAdmin($requestData["email"], $accessByTabs, $roleId);
 
@@ -137,22 +159,13 @@ class HandleRestrictedAdmin
     }
 
     /**
+     * Get tabs that were selected in the widget
+     *
      * @param $requestData
      * @return array
      */
     private function getAccessTabs($requestData)
     {
         return isset($requestData["access_by_tabs"]) ? $requestData["access_by_tabs"] : [];
-    }
-
-    /**
-     * @param $requestData
-     * @return array
-     * @throws \Exception
-     */
-    private function getPayloadDataWithHandledRole($requestData)
-    {
-        $roleId = $this->handleAdminRole($requestData);
-        return $this->getAdminData($requestData, $roleId);
     }
 }

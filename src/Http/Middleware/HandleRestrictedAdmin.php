@@ -10,6 +10,8 @@ use DreamFactory\Core\Enums\LicenseLevel;
 class HandleRestrictedAdmin
 {
 
+    const RESTRICTED_ADMIN_METHODS = ['POST', 'PUT', 'PATCH'];
+
     /**
      * @param         $request
      * @param Closure $next
@@ -20,37 +22,26 @@ class HandleRestrictedAdmin
     function handle($request, Closure $next)
     {
         // Ignore Restricted admin logic for non GOLD subscription
-        if(Environment::getLicenseLevel() !== LicenseLevel::GOLD) {
+        if (Environment::getLicenseLevel() !== LicenseLevel::GOLD) {
             return $next($request);
         };
 
         $route = $request->route();
-        $reqMethod = $request->getMethod();
-        if ($this->isAdminRequest($route)) {
-            switch ($reqMethod) {
-                case 'POST':
-                    {
-                        $this->handleRestrictedAdmin($request, 'create');
-                        break;
-                    }
-                case 'PUT':
-                case 'PATCH':
-                    {
-                        $this->handleRestrictedAdmin($request, 'update');
-                        break;
-                    }
-            }
+        if ($this->isRestrictedAdminRequest($route, $request->getMethod())) {
+            $this->handleRestrictedAdminRequest($request);
         };
         return $next($request);
     }
 
     /**
      * @param $route
+     * @param $method
      * @return bool
      */
-    private function isAdminRequest($route)
+    private function isRestrictedAdminRequest($route, $method)
     {
-        return $route->hasParameter('service') &&
+        return in_array($method, self::RESTRICTED_ADMIN_METHODS) &&
+            $route->hasParameter('service') &&
             $route->parameter('service') === 'system' &&
             $route->hasParameter('resource') &&
             strpos($route->parameter('resource'), 'admin') !== false &&
@@ -59,75 +50,74 @@ class HandleRestrictedAdmin
 
     /**
      * @param $request
-     * @param $action
+     * @return void
      * @throws \Exception
      */
-    private function handleRestrictedAdmin($request, $action)
+    private function handleRestrictedAdminRequest($request)
     {
-        if ($request->has('resource')) {
-            $this->handleRequestWithResource($request, $action);
+        $isResourceWrapped = isset($request->input()['resource']);
+        $method = $request->getMethod();
+        $payload = $request->input();
+        if ($isResourceWrapped) {
+            foreach ($payload['resource'] as $key => $adminData) {
+                $roleId = $this->handleAdminRole($adminData, $method);
+                $payload['resource'][$key] = $this->getAdminData($adminData, $roleId);
+            }
         } else {
-            $this->handleRequestWithoutResource($request, $action);
+            $roleId = $this->handleAdminRole($payload, $method);
+            $payload = $this->getAdminData($payload, $roleId);
         }
+        $request->replace($payload);
     }
 
     /**
-     * @param $request
-     * @param $action
+     * @param $data
+     * @param $requestMethod
+     * @return integer
      * @throws \Exception
      */
-    private function handleRequestWithResource($request, $action)
+    private function handleAdminRole($data, $requestMethod)
     {
-        $reqPayload = $request->input();
-        foreach ($reqPayload['resource'] as $key => $item) {
-            $reqPayload['resource'][$key] = $this->getUpdatedAdminData($action, $item);
-        }
-        $request->replace($reqPayload);
-    }
-
-    /**
-     * @param $request
-     * @param $action
-     * @throws \Exception
-     */
-    private function handleRequestWithoutResource($request, $action)
-    {
-        $request->replace($this->getUpdatedAdminData($action, $request->input()));
-    }
-
-    /**
-     * @param $action
-     * @param $adminData
-     * @return array
-     * @throws \Exception
-     */
-    private function getUpdatedAdminData($action, $adminData)
-    {
-        //TODO: think about a better name, as this function delete update and create restricted admin role
-        $isRestrictedAdmin = isset($adminData["is_restricted_admin"]) && $adminData["is_restricted_admin"];
-        $accessByTabs = isset($adminData["access_by_tabs"]) ? $adminData["access_by_tabs"] : [];
-        $restrictedAdminHelper = new RestrictedAdmin($adminData["email"], $accessByTabs);
-        if ($isRestrictedAdmin && !RestrictedAdmin::isAllTabs($accessByTabs)) {
-            switch ($action) {
-                case 'create':
-                    {
+        $isRestrictedAdmin = isset($data["is_restricted_admin"]) && $data["is_restricted_admin"];
+        $accessByTabs = isset($data["access_by_tabs"]) ? $data["access_by_tabs"] : [];
+        $restrictedAdminHelper = new RestrictedAdmin($data["email"], $accessByTabs);
+        switch ($requestMethod) {
+            case 'POST':
+                {
+                    if ($isRestrictedAdmin && !RestrictedAdmin::isAllTabs($accessByTabs)) {
                         $restrictedAdminHelper->createRestrictedAdminRole();
-                        // Links new role with admin via adding user_to_app_to_role_by_user_id array to request body
-                        $adminData["user_to_app_to_role_by_user_id"] = $restrictedAdminHelper->getUserAppRoleByUserId($isRestrictedAdmin);
-                        break;
                     }
-                case 'update':
-                    {
+                    break;
+                }
+            case 'PUT':
+            case 'PATCH':
+                {
+                    if ($isRestrictedAdmin && !RestrictedAdmin::isAllTabs($accessByTabs)) {
                         $restrictedAdminHelper->updateRestrictedAdminRole();
-                        // Links new role with admin via adding user_to_app_to_role_by_user_id array to request body
-                        $adminId = isset($adminData["id"]) ? $adminData["id"] : null;
-                        $adminData["user_to_app_to_role_by_user_id"] = $restrictedAdminHelper->getUserAppRoleByUserId($isRestrictedAdmin, $adminId);
-                        break;
-                    }
-            };
-        } else {
-            $restrictedAdminHelper->deleteRole();
-        };
-        return $adminData;
+                    } else {
+                        $restrictedAdminHelper->deleteRole();
+                    };
+                    break;
+                }
+        }
+        return $restrictedAdminHelper->getRole()['id'];
+    }
+
+    /**
+     * @param $data
+     * @param $roleId
+     * @return array
+     */
+    private function getAdminData($data, $roleId)
+    {
+        $isRestrictedAdmin = isset($data["is_restricted_admin"]) && $data["is_restricted_admin"];
+        $accessByTabs = isset($data["access_by_tabs"]) ? $data["access_by_tabs"] : [];
+        if ($isRestrictedAdmin && !RestrictedAdmin::isAllTabs($accessByTabs)) {
+            $restrictedAdminHelper = new RestrictedAdmin($data["email"], $accessByTabs, $roleId);
+            // Links new role with admin via adding user_to_app_to_role_by_user_id array to request body
+            $adminId = isset($data["id"]) ? $data["id"] : 0;
+            $data["user_to_app_to_role_by_user_id"] = $restrictedAdminHelper->getUserAppRoleByUserId($isRestrictedAdmin, $adminId);
+        }
+        return $data;
     }
 }

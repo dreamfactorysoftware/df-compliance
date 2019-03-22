@@ -15,6 +15,8 @@ class HandleRestrictedAdmin
 
     private $method;
     private $payload;
+    private $request;
+    private $route;
 
     /**
      * @param         $request
@@ -30,47 +32,47 @@ class HandleRestrictedAdmin
             throw new ForbiddenException('Compliance is not available for your license. Please upgrade to Gold.');
         };
 
-        $route = $request->route();
+        $this->request = $request;
+        $this->route = $request->route();
         $this->method = $request->getMethod();
         $this->payload = $request->input();
-        if ($this->isRestrictedAdminRequest($route, $request->getMethod())) {
-            $this->handleRestrictedAdminRequest($request);
+
+        if ($this->isRestrictedAdminRequest()) {
+            $this->handleRestrictedAdminRequest();
         };
         return $next($request);
     }
 
     /**
-     * @param $route
      * @return bool
      */
-    private function isRestrictedAdminRequest($route)
+    private function isRestrictedAdminRequest()
     {
         return in_array($this->method, self::RESTRICTED_ADMIN_METHODS) &&
-            $route->hasParameter('service') &&
-            $route->parameter('service') === 'system' &&
-            $route->hasParameter('resource') &&
-            strpos($route->parameter('resource'), 'admin') !== false &&
-            strpos($route->parameter('resource'), 'session') === false;
+            $this->route->hasParameter('service') &&
+            $this->route->parameter('service') === 'system' &&
+            $this->route->hasParameter('resource') &&
+            strpos($this->route->parameter('resource'), 'admin') !== false &&
+            strpos($this->route->parameter('resource'), 'session') === false;
     }
 
     /**
-     * @param $request
      * @return void
      * @throws \Exception
      */
-    private function handleRestrictedAdminRequest($request)
+    private function handleRestrictedAdminRequest()
     {
-        $isResourceWrapped = isset($request->input()['resource']);
+        $isResourceWrapped = isset($this->payload['resource']);
         if ($isResourceWrapped) {
             foreach ($this->payload['resource'] as $key => $adminData) {
-                $roleId = $this->handleAdminRole($adminData, $this->method);
+                $roleId = $this->handleAdminRole($adminData);
                 $this->payload['resource'][$key] = $this->getAdminData($adminData, $roleId);
             }
         } else {
-            $roleId = $this->handleAdminRole($this->payload, $this->method);
+            $roleId = $this->handleAdminRole($this->payload);
             $this->payload = $this->getAdminData($this->payload, $roleId);
         }
-        $request->replace($this->payload);
+        $this->request->replace($this->payload);
     }
 
     /**
@@ -118,6 +120,7 @@ class HandleRestrictedAdmin
         $notAllTabsSelected = !RestrictedAdmin::isAllTabs($accessByTabs);
         if ($isRestrictedAdmin && $notAllTabsSelected) {
             $restrictedAdminHelper = new RestrictedAdmin($data["email"], $accessByTabs, $roleId);
+
             // Links new role with admin via adding user_to_app_to_role_by_user_id array to request body
             $adminId = isset($data["id"]) ? $data["id"] : 0;
             $data["user_to_app_to_role_by_user_id"] = $restrictedAdminHelper->getUserAppRoleByUserId($isRestrictedAdmin, $adminId);

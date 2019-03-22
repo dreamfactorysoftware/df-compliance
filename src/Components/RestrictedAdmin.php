@@ -47,15 +47,16 @@ class RestrictedAdmin
      */
     const SYSTEM_SERVICE_NAME = "system";
 
-
     /**
-     * @param array $tabs
      * @param string $email
+     * @param array $tabs
+     * @param int $roleId
      */
-    public function __construct(string $email, array $tabs = [])
+    public function __construct(string $email, array $tabs = [], int $roleId = 0)
     {
         $this->email = $email;
         $this->tabs = $tabs;
+        $this->roleId = $roleId;
     }
 
     /**
@@ -634,7 +635,7 @@ class RestrictedAdmin
     private function validateCurrentUser()
     {
         $currentUserId = Session::getCurrentUserId();
-        $isCurrentUser = AdminUser::getAdminByEmail($this->email)["id"] === $currentUserId;
+        $isCurrentUser = isset(AdminUser::getAdminByEmail($this->email)["id"]) ? AdminUser::getAdminByEmail($this->email)["id"] === $currentUserId : false;
         if ($isCurrentUser) {
             throw new ForbiddenException('Cannot edit your own Role.');
         };

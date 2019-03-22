@@ -13,6 +13,9 @@ class HandleRestrictedAdmin
 
     const RESTRICTED_ADMIN_METHODS = ['POST', 'PUT', 'PATCH'];
 
+    private $method;
+    private $payload;
+
     /**
      * @param         $request
      * @param Closure $next
@@ -28,6 +31,8 @@ class HandleRestrictedAdmin
         };
 
         $route = $request->route();
+        $this->method = $request->getMethod();
+        $this->payload = $request->input();
         if ($this->isRestrictedAdminRequest($route, $request->getMethod())) {
             $this->handleRestrictedAdminRequest($request);
         };
@@ -36,12 +41,11 @@ class HandleRestrictedAdmin
 
     /**
      * @param $route
-     * @param $method
      * @return bool
      */
-    private function isRestrictedAdminRequest($route, $method)
+    private function isRestrictedAdminRequest($route)
     {
-        return in_array($method, self::RESTRICTED_ADMIN_METHODS) &&
+        return in_array($this->method, self::RESTRICTED_ADMIN_METHODS) &&
             $route->hasParameter('service') &&
             $route->parameter('service') === 'system' &&
             $route->hasParameter('resource') &&
@@ -57,35 +61,33 @@ class HandleRestrictedAdmin
     private function handleRestrictedAdminRequest($request)
     {
         $isResourceWrapped = isset($request->input()['resource']);
-        $method = $request->getMethod();
-        $payload = $request->input();
         if ($isResourceWrapped) {
-            foreach ($payload['resource'] as $key => $adminData) {
-                $roleId = $this->handleAdminRole($adminData, $method);
-                $payload['resource'][$key] = $this->getAdminData($adminData, $roleId);
+            foreach ($this->payload['resource'] as $key => $adminData) {
+                $roleId = $this->handleAdminRole($adminData, $this->method);
+                $this->payload['resource'][$key] = $this->getAdminData($adminData, $roleId);
             }
         } else {
-            $roleId = $this->handleAdminRole($payload, $method);
-            $payload = $this->getAdminData($payload, $roleId);
+            $roleId = $this->handleAdminRole($this->payload, $this->method);
+            $this->payload = $this->getAdminData($this->payload, $roleId);
         }
-        $request->replace($payload);
+        $request->replace($this->payload);
     }
 
     /**
      * @param $data
-     * @param $requestMethod
      * @return integer
      * @throws \Exception
      */
-    private function handleAdminRole($data, $requestMethod)
+    private function handleAdminRole($data)
     {
-        $isRestrictedAdmin = isset($data["is_restricted_admin"]) && $data["is_restricted_admin"];
-        $accessByTabs = isset($data["access_by_tabs"]) ? $data["access_by_tabs"] : [];
+        $isRestrictedAdmin = $this->isRestrictedAdmin($data);
+        $accessByTabs = $this->getAccessTabs($data);
         $restrictedAdminHelper = new RestrictedAdmin($data["email"], $accessByTabs);
-        switch ($requestMethod) {
+        $isAllTabsSelected = RestrictedAdmin::isAllTabs($accessByTabs);
+        switch ($this->method) {
             case 'POST':
                 {
-                    if ($isRestrictedAdmin && !RestrictedAdmin::isAllTabs($accessByTabs)) {
+                    if ($isRestrictedAdmin && !$isAllTabsSelected) {
                         $restrictedAdminHelper->createRestrictedAdminRole();
                     }
                     break;
@@ -93,7 +95,7 @@ class HandleRestrictedAdmin
             case 'PUT':
             case 'PATCH':
                 {
-                    if ($isRestrictedAdmin && !RestrictedAdmin::isAllTabs($accessByTabs)) {
+                    if ($isRestrictedAdmin && !$isAllTabsSelected) {
                         $restrictedAdminHelper->updateRestrictedAdminRole();
                     } else {
                         $restrictedAdminHelper->deleteRole();
@@ -111,14 +113,33 @@ class HandleRestrictedAdmin
      */
     private function getAdminData($data, $roleId)
     {
-        $isRestrictedAdmin = isset($data["is_restricted_admin"]) && $data["is_restricted_admin"];
-        $accessByTabs = isset($data["access_by_tabs"]) ? $data["access_by_tabs"] : [];
-        if ($isRestrictedAdmin && !RestrictedAdmin::isAllTabs($accessByTabs)) {
+        $isRestrictedAdmin = $this->isRestrictedAdmin($data);
+        $accessByTabs = $this->getAccessTabs($data);
+        $isAllTabsSelected = RestrictedAdmin::isAllTabs($accessByTabs);
+        if ($isRestrictedAdmin && !$isAllTabsSelected) {
             $restrictedAdminHelper = new RestrictedAdmin($data["email"], $accessByTabs, $roleId);
             // Links new role with admin via adding user_to_app_to_role_by_user_id array to request body
             $adminId = isset($data["id"]) ? $data["id"] : 0;
             $data["user_to_app_to_role_by_user_id"] = $restrictedAdminHelper->getUserAppRoleByUserId($isRestrictedAdmin, $adminId);
         }
         return $data;
+    }
+
+    /**
+     * @param $data
+     * @return bool
+     */
+    private function isRestrictedAdmin($data)
+    {
+        return isset($data["is_restricted_admin"]) && $data["is_restricted_admin"];
+    }
+
+    /**
+     * @param $data
+     * @return array
+     */
+    private function getAccessTabs($data)
+    {
+        return isset($data["access_by_tabs"]) ? $data["access_by_tabs"] : [];
     }
 }

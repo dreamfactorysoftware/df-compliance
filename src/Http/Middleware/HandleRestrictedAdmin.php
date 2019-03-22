@@ -83,11 +83,11 @@ class HandleRestrictedAdmin
         $isRestrictedAdmin = $this->isRestrictedAdmin($data);
         $accessByTabs = $this->getAccessTabs($data);
         $restrictedAdminHelper = new RestrictedAdmin($data["email"], $accessByTabs);
-        $isAllTabsSelected = RestrictedAdmin::isAllTabs($accessByTabs);
+        $notAllTabsSelected = !RestrictedAdmin::isAllTabs($accessByTabs);
         switch ($this->method) {
             case 'POST':
                 {
-                    if ($isRestrictedAdmin && !$isAllTabsSelected) {
+                    if ($isRestrictedAdmin && $notAllTabsSelected) {
                         $restrictedAdminHelper->createRestrictedAdminRole();
                     }
                     break;
@@ -95,7 +95,7 @@ class HandleRestrictedAdmin
             case 'PUT':
             case 'PATCH':
                 {
-                    if ($isRestrictedAdmin && !$isAllTabsSelected) {
+                    if ($isRestrictedAdmin && $notAllTabsSelected) {
                         $restrictedAdminHelper->updateRestrictedAdminRole();
                     } else {
                         $restrictedAdminHelper->deleteRole();
@@ -115,8 +115,8 @@ class HandleRestrictedAdmin
     {
         $isRestrictedAdmin = $this->isRestrictedAdmin($data);
         $accessByTabs = $this->getAccessTabs($data);
-        $isAllTabsSelected = RestrictedAdmin::isAllTabs($accessByTabs);
-        if ($isRestrictedAdmin && !$isAllTabsSelected) {
+        $notAllTabsSelected = !RestrictedAdmin::isAllTabs($accessByTabs);
+        if ($isRestrictedAdmin && $notAllTabsSelected) {
             $restrictedAdminHelper = new RestrictedAdmin($data["email"], $accessByTabs, $roleId);
             // Links new role with admin via adding user_to_app_to_role_by_user_id array to request body
             $adminId = isset($data["id"]) ? $data["id"] : 0;

@@ -6,6 +6,7 @@ use Closure;
 use DreamFactory\Core\Compliance\Components\RestrictedAdmin;
 use DreamFactory\Core\Utility\Environment;
 use DreamFactory\Core\Enums\LicenseLevel;
+use DreamFactory\Core\Exceptions\ForbiddenException;
 
 class HandleRestrictedAdmin
 {
@@ -23,7 +24,7 @@ class HandleRestrictedAdmin
     {
         // Ignore Restricted admin logic for non GOLD subscription
         if (Environment::getLicenseLevel() !== LicenseLevel::GOLD) {
-            return $next($request);
+            throw new ForbiddenException('Compliance is not available for your license. Please upgrade to Gold.');
         };
 
         $route = $request->route();

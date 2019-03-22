@@ -629,7 +629,6 @@ class RestrictedAdmin
     /**
      * Validate current user access
      *
-     * @return mixed
      * @throws ForbiddenException
      */
     private function validateCurrentUser()

@@ -7,12 +7,13 @@ use DreamFactory\Core\Compliance\Components\RestrictedAdmin;
 use DreamFactory\Core\Utility\Environment;
 use DreamFactory\Core\Enums\LicenseLevel;
 use DreamFactory\Core\Exceptions\ForbiddenException;
+use DreamFactory\Core\Enums\Verbs;
 
 class HandleRestrictedAdmin
 {
 
     // Request methods restricted admin logic use
-    const RESTRICTED_ADMIN_METHODS = ['POST', 'PUT', 'PATCH'];
+    const RESTRICTED_ADMIN_METHODS = [Verbs::POST, Verbs::PUT, Verbs::PATCH];
 
     private $method;
     private $payload;

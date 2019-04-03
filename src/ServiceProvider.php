@@ -18,6 +18,8 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
      */
     public function boot()
     {
+        // add migrations, https://laravel.com/docs/5.4/packages#resources
+        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
 
         Event::subscribe(new EventHandler());
 

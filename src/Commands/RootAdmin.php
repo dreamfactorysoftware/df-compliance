@@ -14,7 +14,6 @@ class RootAdmin extends Command
      */
     protected $signature = 'df:root_admin
                                 {--admin_id= : Admin user id}';
-//                            todo: {--first : make the first admin root}'; by created_at column
 
     /**
      * The console command description.

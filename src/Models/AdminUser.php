@@ -60,7 +60,7 @@ class AdminUser extends CoreAdminUser
      * @param $id
      * @return bool|AdminUser
      */
-    public static function isRootById($id)
+    public static function isAdminRootById($id)
     {
         return AdminUser::whereId($id)->first()->is_root_admin;
     }

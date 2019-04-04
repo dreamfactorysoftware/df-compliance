@@ -79,4 +79,20 @@ class AdminUser extends CoreAdminUser
             return $admin;
         }
     }
+
+    /**
+     * Unset given admin as root.
+     *
+     * @param $admin
+     * @return bool
+     */
+    public static function unsetRoot($admin)
+    {
+        if (!$admin->is_sys_admin) {
+            throw new ForbiddenException('Only admins can be root.');
+        } else {
+            $admin->is_root_admin = false;
+            return $admin;
+        }
+    }
 }

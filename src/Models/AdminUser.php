@@ -20,17 +20,18 @@ class AdminUser extends CoreAdminUser
     }
 
     /**
-     * Set given user as root.
+     * Set given admin as root.
      *
-     * @param $user
+     * @param $admin
      * @return bool
      */
-    public static function setRoot($user)
+    public static function setRoot($admin)
     {
-        if (!$user->is_sys_admin) {
+        if (!$admin->is_sys_admin) {
             throw new ForbiddenException('Only admins can be root.');
         } else {
-            return $user->is_root_admin = 1;
+            $admin->is_root_admin = true;
+            return $admin;
         }
     }
 }

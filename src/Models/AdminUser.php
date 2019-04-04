@@ -2,8 +2,8 @@
 
 namespace DreamFactory\Core\Compliance\Models;
 
-use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Models\AdminUser as CoreAdminUser;
+use DreamFactory\Core\Exceptions\ForbiddenException;
 
 class AdminUser extends CoreAdminUser
 {
@@ -63,5 +63,4 @@ class AdminUser extends CoreAdminUser
     {
         return AdminUser::whereId($id)->first()->is_root_admin;
     }
-
 }

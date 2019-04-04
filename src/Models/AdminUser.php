@@ -21,7 +21,6 @@ class AdminUser extends CoreAdminUser
     /**
      * Does Admin with given id exists.
      *
-     * @param $admin
      * @param $id
      * @return bool
      */

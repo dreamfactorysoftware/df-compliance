@@ -2,6 +2,7 @@
 
 namespace DreamFactory\Core\Compliance;
 
+use DreamFactory\Core\Compliance\Commands\RootAdmin;
 use DreamFactory\Core\Compliance\Http\Middleware\AccessibleTabs;
 use DreamFactory\Core\Compliance\Http\Middleware\HandleRestrictedAdmin;
 use Illuminate\Routing\Router;
@@ -16,6 +17,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
     public function boot()
     {
         $this->addMiddleware();
+        $this->addCommands();
     }
 
 
@@ -38,5 +40,17 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
 
         Route::pushMiddlewareToGroup('df.api', 'df.handle_restricted_admin');
         Route::pushMiddlewareToGroup('df.api', 'df.accessible_tabs');
+    }
+
+    /**
+     * Register compliance commands.
+     *
+     * @return void
+     */
+    protected function addCommands()
+    {
+        $this->commands([
+            RootAdmin::class,
+        ]);
     }
 }

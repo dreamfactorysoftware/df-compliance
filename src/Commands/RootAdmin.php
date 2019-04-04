@@ -14,7 +14,7 @@ class RootAdmin extends Command
      */
     protected $signature = 'df:root_admin
                                 {--admin_id= : Admin user id}';
-//                            {--first : make the first admin root}'; by created_at column
+//                            todo: {--first : make the first admin root}'; by created_at column
 
     /**
      * The console command description.
@@ -98,6 +98,8 @@ class RootAdmin extends Command
 
     /**
      * Get Admins that will be displayed.
+     *
+     * @param $admin
      */
     public function changeRootAdmin($admin)
     {
@@ -131,6 +133,8 @@ class RootAdmin extends Command
     }
 
     /**
+     * Map confirmed to respective string
+     *
      * @param $admins
      * @return mixed
      */
@@ -155,6 +159,8 @@ class RootAdmin extends Command
     }
 
     /**
+     * Map is_active to true or false string
+     *
      * @param $admins
      * @return mixed
      */
@@ -172,6 +178,8 @@ class RootAdmin extends Command
     }
 
     /**
+     * Map is_root_admin to true or false string
+     *
      * @param $admins
      * @return mixed
      */

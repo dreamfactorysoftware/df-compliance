@@ -3,6 +3,7 @@
 namespace DreamFactory\Core\Compliance\Commands;
 
 use DreamFactory\Core\Compliance\Models\AdminUser;
+use DreamFactory\Core\Exceptions\NotFoundException;
 use Illuminate\Console\Command;
 
 class RootAdmin extends Command
@@ -37,67 +38,54 @@ class RootAdmin extends Command
     public function handle()
     {
         try {
-            $headers = ['Id', 'Email', 'Display Name', 'First Name', 'Last Name', 'Active', 'Root Admin', 'Registration'];
+            $admins = $this->getAllAdmins();
 
-            $admins = $this->getAdmins();
-
-            $this->info('**********************************************************************************************************************');
-            $this->info('Admins');
-            $this->table($headers, $admins);
-            $this->info('**********************************************************************************************************************');
+            $this->printAdmins($admins);
 
             $adminId = $this->option('admin_id');
-            $adminExists = AdminUser::adminExistsById($adminId);
 
-            if ($this->isOneAdmin()) {
+            if ($this->isSingleAdmin()) {
                 $adminId = $admins[0]['id'];
-                $adminExists = AdminUser::adminExistsById($adminId);
-            } else if (!$this->isOneAdmin() && empty($adminId)) {
-                while (!$adminExists) {
+            } else if (!$this->isSingleAdmin() && empty($adminId)) {
+                while (!AdminUser::adminExistsById($adminId)) {
                     $adminId = $this->ask('Enter Admin Id');
-                    $adminExists = AdminUser::adminExistsById($adminId);
-                    if (!$adminExists) {
+                    if (!AdminUser::adminExistsById($adminId)) {
                         $this->error('Admin does not exist.');
                     }
                 }
             }
 
-            if ($adminExists) {
-                $admin = AdminUser::where(['id' => $adminId, 'is_sys_admin' => true])->first();
-                $this->changeRootAdmin($admin);
-            } else {
-                $this->error('Admin does not exist.');
+            if (!AdminUser::adminExistsById($adminId)) {
+                throw new NotFoundException("Admin does not exist");
             }
+
+            $admin = AdminUser::where(['id' => $adminId, 'is_sys_admin' => true])->first();
+            $this->changeRootAdmin($admin);
+
         } catch (\Exception $e) {
             $this->error($e->getMessage());
         }
     }
 
     /**
-     * Get Admins that will be displayed.
+     * Is there only one admin.
      */
-    public function isOneAdmin()
+    public function isSingleAdmin()
     {
-        $adminsCount = AdminUser::whereIsSysAdmin(true)->count();
-        if ($adminsCount === 1) {
-            return true;
-        } else {
-            return false;
-        }
+        return AdminUser::whereIsSysAdmin(true)->count() == 1;
     }
 
     /**
      * Get Admins that will be displayed.
      */
-    public function getAdmins()
+    public function getAllAdmins()
     {
         $admins = AdminUser::whereIsSysAdmin(true)->get(['id', 'email', 'name', 'first_name', 'last_name', 'is_active', 'is_root_admin'])->toArray();
-        $admins = $this->mapAdmins($admins);
         return $admins;
     }
 
     /**
-     * Get Admins that will be displayed.
+     * Make another admin root.
      *
      * @param $admin
      */
@@ -105,92 +93,83 @@ class RootAdmin extends Command
     {
         $currentRootAdmin = AdminUser::whereIsRootAdmin(true)->first();
         $rootAdminExists = AdminUser::whereIsRootAdmin(true)->exists();
-        if ($rootAdminExists && $currentRootAdmin->id === $admin->id && $currentRootAdmin->is_root_admin && $admin->is_root_admin) {
-            $this->info('Admin \'' . $admin->toArray()['email'] . '\' is already root!');
-        } else {
-            if ($rootAdminExists) {
-                AdminUser::unsetRoot($currentRootAdmin)->save();
-            }
-            AdminUser::setRoot($admin)->save();
-            $this->info('\'' . $admin->email . '\' is now root admin!');
-            $this->info('**********************************************************************************************************************');
+
+        if ($rootAdminExists) {
+            AdminUser::unsetRoot($currentRootAdmin)->save();
         }
+
+        AdminUser::makeRoot($admin)->save();
+        $this->info('\'' . $admin->email . '\' is now root admin!');
+        $this->info('**********************************************************************************************************************');
     }
 
     /**
-     * Map admins to same view as on UI
+     * Print admins table.
+     *
+     * @param $admins
+     */
+    protected function printAdmins($admins)
+    {
+        $admins = $this->humanizeAdminRecords($admins);
+
+        $headers = ['Id', 'Email', 'Display Name', 'First Name', 'Last Name', 'Active', 'Root Admin', 'Registration'];
+
+        $this->info('**********************************************************************************************************************');
+        $this->info('Admins');
+        $this->table($headers, $admins);
+        $this->info('**********************************************************************************************************************');
+    }
+
+    /**
+     * Map admins to the same view as on UI
      *
      * @param $admins
      * @return mixed
      */
-    private function mapAdmins($admins)
+    private function humanizeAdminRecords($admins)
     {
-        $admins = $this->mapAdminConfirmed($admins);
-        $admins = $this->mapAdminIsActive($admins);
-        $admins = $this->mapAdminRoot($admins);
+        $admins = $this->humanizeAdminConfirmationStatus($admins);
+
+        foreach ($admins as $key => $admin) {
+            $admins[$key]['is_active'] = var_export($admin['is_active'], true);
+            $admins[$key]['is_root_admin'] = var_export(to_bool($admin['is_root_admin']), true);
+        }
 
         return $admins;
     }
 
     /**
-     * Map confirmed to respective string
+     * Map confirmed to respective string.
      *
      * @param $admins
      * @return mixed
      */
-    private function mapAdminConfirmed($admins)
+    private function humanizeAdminConfirmationStatus($admins)
     {
         foreach ($admins as $key => $admin) {
-            $confirm_msg = 'N/A';
 
-            if ($admin['confirmed']) {
-                $confirm_msg = 'Confirmed';
-            } elseif (!$admin['confirmed']) {
-                $confirm_msg = 'Pending';
+            switch ($admin) {
+                case ($admin['confirmed']):
+                    {
+                        $confirm_msg = 'Confirmed';
+                        break;
+                    }
+                case (!$admin['confirmed']):
+                    {
+                        $confirm_msg = 'Pending';
+                        break;
+                    }
+                case ($admin['expired']):
+                    {
+                        $confirm_msg = 'Expired';
+                        break;
+                    }
+                default:{
+                    $confirm_msg = 'N/A';
+                }
             }
 
-            if ($admin['expired']) {
-                $confirm_msg = 'Expired';
-            }
             $admins[$key]['confirmed'] = $confirm_msg;
-        }
-
-        return $admins;
-    }
-
-    /**
-     * Map is_active to true or false string
-     *
-     * @param $admins
-     * @return mixed
-     */
-    private function mapAdminIsActive($admins)
-    {
-        foreach ($admins as $key => $admin) {
-            if ($admin['is_active']) {
-                $admins[$key]['is_active'] = 'true';
-            } else {
-                $admins[$key]['is_active'] = 'false';
-            }
-        }
-
-        return $admins;
-    }
-
-    /**
-     * Map is_root_admin to true or false string
-     *
-     * @param $admins
-     * @return mixed
-     */
-    private function mapAdminRoot($admins)
-    {
-        foreach ($admins as $key => $admin) {
-            if ($admin['is_root_admin']) {
-                $admins[$key]['is_root_admin'] = 'true';
-            } else {
-                $admins[$key]['is_root_admin'] = 'false';
-            }
         }
 
         return $admins;

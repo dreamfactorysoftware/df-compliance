@@ -36,14 +36,10 @@ class AdminUser extends CoreAdminUser
      * @param $admin
      * @return bool
      */
-    public static function setRoot($admin)
+    public static function makeRoot($admin)
     {
-        if (!$admin->is_sys_admin) {
-            throw new ForbiddenException('Only admins can be root.');
-        } else {
-            $admin->is_root_admin = true;
-            return $admin;
-        }
+        $admin->is_root_admin = true;
+        return $admin;
     }
 
     /**
@@ -54,12 +50,8 @@ class AdminUser extends CoreAdminUser
      */
     public static function unsetRoot($admin)
     {
-        if (!$admin->is_sys_admin) {
-            throw new ForbiddenException('Only admins can be root.');
-        } else {
-            $admin->is_root_admin = false;
-            return $admin;
-        }
+        $admin->is_root_admin = false;
+        return $admin;
     }
 
     /**
@@ -68,7 +60,7 @@ class AdminUser extends CoreAdminUser
      * @param $id
      * @return bool|AdminUser
      */
-    public static function isAdminRootById($id)
+    public static function isRootById($id)
     {
         return AdminUser::whereId($id)->first()->is_root_admin;
     }

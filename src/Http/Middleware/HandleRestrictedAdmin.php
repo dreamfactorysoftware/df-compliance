@@ -34,16 +34,19 @@ class HandleRestrictedAdmin
         $this->method = $request->getMethod();
         $this->payload = $request->input();
 
-        if ($this->isRestrictedAdminRequest() && $this->isValidLicense()) {
-            $this->handleRestrictedAdminRequest();
-        } elseif (!$this->isValidLicense()) {
+        if (!$this->isValidLicense()) {
             throw new ForbiddenException('Compliance is not available for your license. Please upgrade to Gold.');
         };
+
+        if ($this->isRestrictedAdminRequest()) {
+            $this->handleRestrictedAdminRequest();
+        }
+
         return $next($request);
     }
 
     /**
-     * Does request goes to system/admin/* endpoint (except system/admin/session)
+     * Does request go to system/admin/* endpoint (except system/admin/session)
      *
      * @return bool
      */

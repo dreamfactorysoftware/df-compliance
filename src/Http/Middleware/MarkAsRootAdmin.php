@@ -7,7 +7,7 @@ use Closure;
 use DreamFactory\Core\Compliance\Models\AdminUser;
 use DreamFactory\Core\Enums\Verbs;
 
-class RootAdmin
+class MarkAsRootAdmin
 {
     private $method;
     private $route;
@@ -25,22 +25,23 @@ class RootAdmin
         $this->method = $request->getMethod();
         $response = $next($request);
 
-        if ($this->isSessionRequest()) {
-            $content = $response->getOriginalContent();
-            $content['is_root_admin'] = AdminUser::isAdminRootById($content['id']) ? true : false;
-            $response->setContent($content);
-            return $response;
-        } else {
+        if (!$this->isAdminSessionRequest()) {
             return $response;
         }
+
+        $content = $response->getOriginalContent();
+        $content['is_root_admin'] = isset($content['id']) && AdminUser::isRootById($content['id']);
+        $response->setContent($content);
+
+        return $response;
     }
 
     /**
-     * Should set Admin As Root
+     * Does request goes to admin/session
      *
      * @return bool
      */
-    private function isSessionRequest()
+    private function isAdminSessionRequest()
     {
         return $this->method === Verbs::POST &&
             $this->route->hasParameter('service') &&

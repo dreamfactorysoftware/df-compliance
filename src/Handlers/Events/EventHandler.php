@@ -32,8 +32,11 @@ class EventHandler
      */
     public function handleUserCreatingEvent($event)
     {
-        if (!AdminUser::adminExists()) {
-            AdminUser::setRoot($event->user);
+        $isFirstAdmin = !AdminUser::adminExists();
+
+        if ($isFirstAdmin) {
+            $user = $event->user;
+            AdminUser::setRoot($user);
         }
     }
 }

@@ -6,7 +6,7 @@ use DreamFactory\Core\Compliance\Commands\RootAdmin;
 use DreamFactory\Core\Compliance\Handlers\Events\EventHandler;
 use DreamFactory\Core\Compliance\Http\Middleware\AccessibleTabs;
 use DreamFactory\Core\Compliance\Http\Middleware\HandleRestrictedAdmin;
-use DreamFactory\Core\Compliance\Http\Middleware\RootAdmin as RootAdminMiddleware;
+use DreamFactory\Core\Compliance\Http\Middleware\MarkAsRootAdmin as MarkRootAdminMiddleware;
 use Illuminate\Routing\Router;
 use Route;
 use Event;
@@ -18,6 +18,8 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
      */
     public function boot()
     {
+        // add migrations, https://laravel.com/docs/5.4/packages#resources
+        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
 
         Event::subscribe(new EventHandler());
 
@@ -37,17 +39,17 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
     {
         // the method name was changed in Laravel 5.4
         if (method_exists(Router::class, 'aliasMiddleware')) {
-            Route::aliasMiddleware('df.root_admin', RootAdminMiddleware::class);
+            Route::aliasMiddleware('df.mark_root_admin', MarkRootAdminMiddleware::class);
             Route::aliasMiddleware('df.handle_restricted_admin', HandleRestrictedAdmin::class);
             Route::aliasMiddleware('df.accessible_tabs', AccessibleTabs::class);
         } else {
             /** @noinspection PhpUndefinedMethodInspection */
-            Route::middleware('df.root_admin', RootAdminMiddleware::class);
+            Route::middleware('df.mark_root_admin', MarkRootAdminMiddleware::class);
             Route::middleware('df.handle_restricted_admin', HandleRestrictedAdmin::class);
             Route::middleware('df.accessible_tabs', AccessibleTabs::class);
         }
 
-        Route::pushMiddlewareToGroup('df.api', 'df.root_admin');
+        Route::pushMiddlewareToGroup('df.api', 'df.mark_root_admin');
         Route::pushMiddlewareToGroup('df.api', 'df.handle_restricted_admin');
         Route::pushMiddlewareToGroup('df.api', 'df.accessible_tabs');
     }

@@ -44,7 +44,8 @@ class HandleRestrictedAdmin
             };
 
             $this->handleRestrictedAdminRequest();
-        }
+        };
+
         return $next($request);
     }
 

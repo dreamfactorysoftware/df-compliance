@@ -43,7 +43,7 @@ class HandleRestrictedAdmin
     }
 
     /**
-     * Does request goes to system/admin/* endpoint (except system/admin/session)
+     * Does request go to system/admin/* endpoint (except system/admin/session)
      *
      * @return bool
      */

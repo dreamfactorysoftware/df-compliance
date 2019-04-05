@@ -7,7 +7,6 @@ use DreamFactory\Core\Compliance\Components\RestrictedAdmin;
 use DreamFactory\Core\Compliance\Utility\LicenseCheck;
 use DreamFactory\Core\Compliance\Utility\MiddlewareHelper;
 use DreamFactory\Core\Enums\Verbs;
-use Illuminate\Support\Str;
 
 class AccessibleTabs
 {

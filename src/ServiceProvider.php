@@ -2,7 +2,7 @@
 
 namespace DreamFactory\Core\Compliance;
 
-use DreamFactory\Core\Compliance\Commands\RootAdmin;
+use DreamFactory\Core\Compliance\Commands\RootAdmin as RootAdminCommand;
 use DreamFactory\Core\Compliance\Handlers\Events\EventHandler;
 use DreamFactory\Core\Compliance\Http\Middleware\AccessibleTabs;
 use DreamFactory\Core\Compliance\Http\Middleware\HandleRestrictedAdmin;
@@ -59,7 +59,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
     protected function addCommands()
     {
         $this->commands([
-            RootAdmin::class,
+            RootAdminCommand::class,
         ]);
     }
 }

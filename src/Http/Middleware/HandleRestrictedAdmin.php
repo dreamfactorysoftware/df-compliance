@@ -4,7 +4,6 @@ namespace DreamFactory\Core\Compliance\Http\Middleware;
 
 use DreamFactory\Core\Compliance\Components\RestrictedAdmin;
 use DreamFactory\Core\Compliance\Models\AdminUser;
-
 use DreamFactory\Core\Compliance\Utility\LicenseCheck;
 use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Enums\Verbs;

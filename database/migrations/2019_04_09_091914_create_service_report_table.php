@@ -12,17 +12,12 @@ class CreateServiceReportTable extends Migration
      */
     public function up()
     {
-        $driver = Schema::getConnection()->getDriverName();
-        // Even though we take care of this scenario in the code,
-        // SQL Server does not allow potential cascading loops,
-        // so set the default no action and clear out created/modified by another user when deleting a user.
-        $onDelete = (('sqlsrv' === $driver) ? 'no action' : 'set null');
-
         // service-reports
         Schema::create(
             'service_report',
-            function (Blueprint $t) use ($onDelete){
+            function (Blueprint $t) {
                 $t->increments('id');
+                $t->integer('service_id')->nullable();
                 $t->string('service_name');
                 $t->string('user_email');
                 $t->string('action')->nullable();

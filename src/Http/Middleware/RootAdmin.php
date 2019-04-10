@@ -27,7 +27,7 @@ class RootAdmin
 
         if ($this->isSessionRequest()) {
             $content = $response->getOriginalContent();
-            $content['is_root_admin'] = AdminUser::isAdminRootById($content['id']) ? true : false;
+            $content['is_root_admin'] = isset($content['id']) && AdminUser::isAdminRootById($content['id']) ? true : false;
             $response->setContent($content);
             return $response;
         } else {

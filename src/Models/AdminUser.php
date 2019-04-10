@@ -63,5 +63,4 @@ class AdminUser extends CoreAdminUser
     {
         return AdminUser::whereId($id)->first()->is_root_admin;
     }
-
 }

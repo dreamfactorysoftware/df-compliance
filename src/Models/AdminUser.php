@@ -38,12 +38,8 @@ class AdminUser extends CoreAdminUser
      */
     public static function setRoot($admin)
     {
-        if (!$admin->is_sys_admin) {
-            throw new ForbiddenException('Only admins can be root.');
-        } else {
-            $admin->is_root_admin = true;
-            return $admin;
-        }
+        $admin->is_root_admin = true;
+        return $admin;
     }
 
     /**
@@ -54,12 +50,8 @@ class AdminUser extends CoreAdminUser
      */
     public static function unsetRoot($admin)
     {
-        if (!$admin->is_sys_admin) {
-            throw new ForbiddenException('Only admins can be root.');
-        } else {
-            $admin->is_root_admin = false;
-            return $admin;
-        }
+        $admin->is_root_admin = false;
+        return $admin;
     }
 
     /**

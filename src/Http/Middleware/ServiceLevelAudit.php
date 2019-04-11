@@ -70,6 +70,8 @@ class ServiceLevelAudit
         $serviceName = '';
         if (gettype($service) === "string") {
             $serviceName = $this->getServiceNameById($service);
+        } elseif (isset($service['id'])) {
+            $serviceName = $this->getServiceNameById($service['id']);
         } elseif (isset($service['name'])) {
             $serviceName = $service['name'];
         }

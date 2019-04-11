@@ -5,6 +5,7 @@ namespace DreamFactory\Core\Compliance\Http\Middleware;
 use DreamFactory\Core\Compliance\Models\ServiceReport;
 use DreamFactory\Core\Utility\Session;
 use DreamFactory\Core\Utility\ResourcesWrapper;
+use DreamFactory\Core\Enums\Verbs;
 
 use Closure;
 use Route;
@@ -28,37 +29,85 @@ class ServiceLevelAudit
     {
         $this->route = $request->route();
         $this->method = $request->getMethod();
-        $this->resource = $this->route->parameter('resource');
         $this->payload = $request->input();
         $this->request = $request;
 
         if ($this->isServiceRequest()) {
-            $this->createServiceReport();
+            $this->resource = $this->route->parameter('resource');
+            $serviceReportsData = $this->getReportsData();
+            $response = $next($request);
+
+            $this->createServiceReports($response, $serviceReportsData);
+        } else {
+            return $next($request);
         }
 
-        return $next($request);
+        return $response;
     }
 
+    /**
+     * Is request goes to system/service, except GET requests
+     *
+     * @return bool
+     */
     protected function isServiceRequest()
     {
         return $this->route->hasParameter('service') &&
             $this->route->parameter('service') === 'system' &&
             $this->route->hasParameter('resource') &&
             strpos($this->route->parameter('resource'), 'service') !== false &&
-            $this->method !== 'GET';
+            $this->method !== Verbs::GET;
     }
 
+    /**
+     * Get service name by id or from request payload
+     *
+     * @param $service
+     * @return bool
+     */
     protected function getServiceName($service)
     {
-        $serviceId = array_get((!empty($this->resource)) ? explode('/', $this->resource) : [], 1);
-        if (!is_null($serviceId) && ('' !== $serviceId)) {
-            return ServiceManager::getServiceNameById($serviceId);
-        } elseif(isset($service['name'])) {
-            return $service['name'];
+        $serviceName = '';
+        if (gettype($service) === "string") {
+            $serviceName = $this->getServiceNameById($service);
+        } elseif (isset($service['name'])) {
+            $serviceName = $service['name'];
         }
-        return '';
+
+        return $serviceName;
     }
 
+    /**
+     * Get service name by given id
+     *
+     * @param $serviceId
+     * @return bool
+     */
+    protected function getServiceNameById($serviceId)
+    {
+        $serviceName = '';
+        if (!is_null($serviceId) && ('' !== $serviceId)) {
+            $serviceName = ServiceManager::getServiceNameById($serviceId);
+        }
+
+        return $serviceName;
+    }
+
+    /**
+     * Get service id from request, the one that is in URL
+     *
+     * @return bool
+     */
+    protected function getServiceIdFromResource()
+    {
+        return array_get((!empty($this->resource)) ? explode('/', $this->resource) : [], 1);
+    }
+
+    /**
+     * Get action caption for the report
+     *
+     * @return bool
+     */
     protected function getAction()
     {
         $action = '';
@@ -83,6 +132,11 @@ class ServiceLevelAudit
         return $action;
     }
 
+    /**
+     * Get currently logged in user email
+     *
+     * @return array
+     */
     protected function getUserEmail()
     {
         $user = Session::user();
@@ -93,6 +147,30 @@ class ServiceLevelAudit
     }
 
     /**
+     * Get service reports data array
+     *
+     * @return array
+     */
+    protected function getReportsData()
+    {
+        $reportsData = [];
+        if ($this->getServiceIdFromResource()) {
+            $reportsData[] = $this->getReportData($this->getServiceIdFromResource());
+        } elseif ($this->hasIdsParameter()) {
+            foreach ($this->getIdsFromPayload() as $serviceId) {
+                $reportsData[] = $this->getReportData($serviceId);
+            }
+        } elseif ($this->isResourceWrapped()) {
+            foreach ($this->payload['resource'] as $serviceData) {
+                $reportsData[] = $this->getReportData($serviceData);
+            };
+        }
+        return $reportsData;
+    }
+
+    /**
+     * get a service report data
+     *
      * @param $serviceData
      * @return mixed
      */
@@ -104,21 +182,60 @@ class ServiceLevelAudit
             'request_verb' => $this->method];
     }
 
-    protected function createServiceReport()
+    /**
+     * Create service reports except failed ones
+     *
+     * @param $response
+     * @param $reportsData
+     * @return void
+     */
+    protected function createServiceReports($response, $reportsData)
     {
-        if ($this->isResourceWrapped()) {
-            foreach ($this->payload['resource'] as $service) {
-                ServiceReport::create($this->getReportData($service))->save();
+        if (!$this->isFailure($response)) {
+            foreach ($reportsData as $report) {
+                ServiceReport::create($report)->save();
             }
-        } else {
-            ServiceReport::create($this->getReportData($this->payload))->save();
         }
     }
 
+    /**
+     * Is payload wrapped in resource array
+     *
+     * @return bool
+     */
     protected function isResourceWrapped()
     {
         return isset($this->payload['resource']);
     }
 
+    /**
+     * Is request failed
+     *
+     * @param $response
+     * @return bool
+     */
+    protected function isFailure($response)
+    {
+        return isset($response->getOriginalContent()['error']) || $response->status() >= 400;
+    }
 
+    /**
+     * Has ?ids parameter specified
+     *
+     * @return bool
+     */
+    protected function hasIdsParameter()
+    {
+        return isset($this->payload['ids']);
+    }
+
+    /**
+     * Get ?ids= from the request
+     *
+     * @return array
+     */
+    protected function getIdsFromPayload()
+    {
+        return explode(',', $this->payload['ids']);
+    }
 }

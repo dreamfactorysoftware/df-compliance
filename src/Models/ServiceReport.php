@@ -34,11 +34,12 @@ class ServiceReport extends BaseSystemModel
 
     protected $fillable = [
         'id',
+        'service_id',
         'service_name',
         'user_email',
         'action',
         'request_verb',
     ];
 
-    protected $casts = ['id' => 'integer'];
+    protected $casts = ['id' => 'integer', 'service_id'=> 'integer'];
 }

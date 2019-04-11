@@ -17,6 +17,7 @@ class CreateServiceReportTable extends Migration
             'service_report',
             function (Blueprint $t) {
                 $t->increments('id');
+                $t->integer('service_id')->nullable();
                 $t->string('service_name');
                 $t->string('user_email');
                 $t->string('action')->nullable();

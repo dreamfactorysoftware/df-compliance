@@ -176,7 +176,8 @@ class ServiceLevelAudit
      */
     protected function getReportData($serviceData)
     {
-        return ['service_name' => $this->getServiceName($serviceData),
+        return ['service_id' => $this->getServiceId($serviceData),
+            'service_name' => $this->getServiceName($serviceData),
             'user_email' => $this->getUserEmail(),
             'action' => $this->getAction(),
             'request_verb' => $this->method];
@@ -237,5 +238,20 @@ class ServiceLevelAudit
     protected function getIdsFromPayload()
     {
         return explode(',', $this->payload['ids']);
+    }
+
+    /**
+     * Get service_id from URL or from payload
+     *
+     * @param $serviceData
+     * @return array
+     */
+    protected function getServiceId($serviceData)
+    {
+        if (gettype($serviceData) === "string") {
+            return $serviceData;
+        } else {
+            return isset($serviceData['id']) ? $serviceData['id'] : null;
+        }
     }
 }

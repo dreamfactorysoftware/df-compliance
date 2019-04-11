@@ -2,9 +2,12 @@
 
 namespace DreamFactory\Core\Compliance\Http\Middleware;
 
+use DreamFactory\Core\Compliance\Models\AdminUser;
 use DreamFactory\Core\Compliance\Models\ServiceReport;
+use DreamFactory\Core\Compliance\Utility\LicenseCheck;
 use DreamFactory\Core\Utility\Session;
 use DreamFactory\Core\Utility\ResourcesWrapper;
+use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Enums\Verbs;
 
 use Closure;
@@ -32,6 +35,14 @@ class ServiceLevelAudit
         $this->payload = $request->input();
         $this->request = $request;
 
+        if ($this->isServiceReportRequest()) {
+            if (!LicenseCheck::isValidLicense() && AdminUser::isCurrentUserRootAdmin()) {
+                throw new ForbiddenException('Service reports are not available for your license. Please upgrade to Gold.');
+            } elseif (!AdminUser::isCurrentUserRootAdmin()) {
+                throw new ForbiddenException('Service Reports only available for root admin.');
+            }
+        }
+
         if ($this->isServiceRequest()) {
             $this->resource = $this->route->parameter('resource');
             $serviceReportsData = $this->getReportsData();
@@ -43,6 +54,19 @@ class ServiceLevelAudit
         }
 
         return $response;
+    }
+
+    /**
+     * Is request goes to system/service_report
+     *
+     * @return bool
+     */
+    private function isServiceReportRequest()
+    {
+        return $this->route->hasParameter('service') &&
+            $this->route->parameter('service') === 'system' &&
+            $this->route->hasParameter('resource') &&
+            strpos($this->route->parameter('resource'), 'service_report') !== false;
     }
 
     /**

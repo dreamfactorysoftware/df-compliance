@@ -6,6 +6,7 @@ use DreamFactory\Core\Compliance\Components\RestrictedAdmin;
 use DreamFactory\Core\Compliance\Models\AdminUser;
 use DreamFactory\Core\Compliance\Utility\LicenseCheck;
 use DreamFactory\Core\Exceptions\ForbiddenException;
+use DreamFactory\Core\Models\UserAppRole;
 use DreamFactory\Core\Enums\Verbs;
 
 use Closure;
@@ -35,6 +36,10 @@ class HandleRestrictedAdmin
         $this->method = $request->getMethod();
         $this->payload = $request->input();
 
+        if ($this->isDeleteRestrictedAdminRoleRequest() && !AdminUser::isCurrentUserRootAdmin()) {
+            throw new ForbiddenException('You do not have permission to delete restricted admin\'s role. Please contact your root administrator.');
+        }
+
         if ($this->isRestrictedAdminRequest() && AdminUser::isCurrentUserRootAdmin()) {
             if (!LicenseCheck::isGoldLicense()) {
                 throw new ForbiddenException('Restricted admins are not available for your license. Please upgrade to Gold.');
@@ -60,6 +65,43 @@ class HandleRestrictedAdmin
             strpos($this->route->parameter('resource'), 'admin') !== false &&
             strpos($this->route->parameter('resource'), 'session') === false &&
             $this->isRestrictedAdmin();
+    }
+
+    /**
+     * Is request goes to system/role/* endpoint
+     *
+     * @return bool
+     */
+    private function isDeleteRestrictedAdminRoleRequest()
+    {
+        $roleIds = $this->getResourceId();
+
+        if (count($roleIds) === 0) {
+            $roleIds = $this->request->input('ids') ? explode(',', $this->request->input('ids')) : [];
+        }
+
+        return $this->method === Verbs::DELETE &&
+            $this->route->hasParameter('service') &&
+            $this->route->parameter('service') === 'system' &&
+            $this->route->hasParameter('resource') &&
+            strpos($this->route->parameter('resource'), 'role') !== false &&
+            $this->isRestrictedAdminRoles($roleIds);
+    }
+
+    /**
+     * Is any role belong to any RA
+     *
+     * @param $roleIds
+     * @return boolean
+     */
+    protected function isRestrictedAdminRoles($roleIds)
+    {
+        foreach ($roleIds as $roleId) {
+            if (UserAppRole::whereRoleId($roleId)->exists() && AdminUser::adminExistsById($this->getUserIdFromUserAppRole($roleId))) {
+                return true;
+            }
+        };
+        return false;
     }
 
     /**
@@ -178,5 +220,27 @@ class HandleRestrictedAdmin
     private function getAccessTabs($requestData)
     {
         return isset($requestData["access_by_tabs"]) ? $requestData["access_by_tabs"] : [];
+    }
+
+    /**
+     * Get resource Id
+     *
+     * @return array
+     */
+    private function getResourceId()
+    {
+        $id = array_get((!empty($this->route->parameter('resource'))) ? explode('/', $this->route->parameter('resource')) : [], 1);
+        return $id ?
+            [$id] :
+            [];
+    }
+
+    /**
+     * @param $roleId
+     * @return mixed
+     */
+    protected function getUserIdFromUserAppRole($roleId)
+    {
+        return UserAppRole::whereRoleId($roleId)->get()->toArray()[0]['user_id'];
     }
 }

@@ -40,4 +40,12 @@ class ServiceReport extends BaseSystemResource
     {
         throw new NotImplementedException('The verb "' . $this->request->getMethod() . '" is not supported.');
     }
+
+    /**
+     * {@inheritdoc}
+     */
+    protected function handleDELETE()
+    {
+        throw new NotImplementedException('The verb "' . $this->request->getMethod() . '" is not supported.');
+    }
 }

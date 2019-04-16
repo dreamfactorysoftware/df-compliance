@@ -20,7 +20,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
 
         Event::subscribe(new EventHandler());
-
+      
         $this->addMiddleware();
     }
 

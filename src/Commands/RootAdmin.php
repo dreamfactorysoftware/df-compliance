@@ -168,7 +168,6 @@ class RootAdmin extends Command
                     $confirm_msg = 'N/A';
                 }
             }
-
             $admins[$key]['confirmed'] = $confirm_msg;
         }
 

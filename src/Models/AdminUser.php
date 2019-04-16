@@ -36,7 +36,7 @@ class AdminUser extends CoreAdminUser
      * @param $admin
      * @return bool
      */
-    public static function setRoot($admin)
+    public static function makeRoot($admin)
     {
         $admin->is_root_admin = true;
         return $admin;
@@ -60,7 +60,7 @@ class AdminUser extends CoreAdminUser
      * @param $id
      * @return bool|AdminUser
      */
-    public static function isAdminRootById($id)
+    public static function isRootById($id)
     {
         return AdminUser::whereId($id)->first()->is_root_admin;
     }

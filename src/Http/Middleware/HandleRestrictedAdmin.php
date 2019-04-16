@@ -43,7 +43,7 @@ class HandleRestrictedAdmin
     }
 
     /**
-     * Is request goes to system/admin/* endpoint (except system/admin/session)
+     * Does request goes to system/admin/* endpoint (except system/admin/session)
      *
      * @return bool
      */
@@ -59,7 +59,7 @@ class HandleRestrictedAdmin
     }
 
     /**
-     * Is licence is Gold
+     * Is Gold licence
      *
      * @return bool
      */

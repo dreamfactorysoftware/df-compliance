@@ -38,15 +38,16 @@ class RootAdmin extends Command
     public function handle()
     {
         try {
-            $admins = $this->getAllAdmins();
+            $adminId = null;
 
+            $admins = $this->getAllAdmins();
             $this->printAdmins($admins);
 
-            $adminId = $this->option('admin_id');
-
-            if ($this->isSingleAdmin()) {
+            if ($this->option('admin_id')) {
+                $adminId = $this->option('admin_id');
+            } elseif ($this->isSingleAdmin()) {
                 $adminId = $admins[0]['id'];
-            } else if (!$this->isSingleAdmin() && empty($adminId)) {
+            } else {
                 while (!AdminUser::adminExistsById($adminId)) {
                     $adminId = $this->ask('Enter Admin Id');
                     if (!AdminUser::adminExistsById($adminId)) {

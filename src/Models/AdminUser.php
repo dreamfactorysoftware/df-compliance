@@ -1,5 +1,8 @@
 <?php
+
 namespace DreamFactory\Core\Compliance\Models;
+
+use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Models\AdminUser as CoreAdminUser;
 
 
@@ -14,5 +17,21 @@ class AdminUser extends CoreAdminUser
     public static function getAdminByEmail($email)
     {
         return self::whereEmail($email)->get()->toArray()[0];
+    }
+
+    /**
+     * Set given admin as root.
+     *
+     * @param $admin
+     * @return bool
+     */
+    public static function setRoot($admin)
+    {
+        if (!$admin->is_sys_admin) {
+            throw new ForbiddenException('Only admins can be root.');
+        } else {
+            $admin->is_root_admin = true;
+            return $admin;
+        }
     }
 }

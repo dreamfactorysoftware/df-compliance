@@ -2,6 +2,7 @@
 
 namespace DreamFactory\Core\Compliance;
 
+use DreamFactory\Core\Compliance\Handlers\Events\EventHandler;
 use DreamFactory\Core\Compliance\Http\Middleware\AccessibleTabs;
 use DreamFactory\Core\Compliance\Http\Middleware\HandleRestrictedAdmin;
 use Illuminate\Routing\Router;
@@ -18,6 +19,8 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
         // add migrations, https://laravel.com/docs/5.4/packages#resources
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
 
+        Event::subscribe(new EventHandler());
+      
         $this->addMiddleware();
     }
 

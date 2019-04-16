@@ -36,7 +36,7 @@ class EventHandler
 
         if ($isFirstAdmin) {
             $user = $event->user;
-            AdminUser::setRoot($user);
+            AdminUser::makeRoot($user);
         }
     }
 }

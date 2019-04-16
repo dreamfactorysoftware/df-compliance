@@ -43,10 +43,7 @@ class MarkAsRootAdmin
      */
     private function isAdminSessionRequest()
     {
-        return $this->method === Verbs::POST &&
-            $this->route->hasParameter('service') &&
-            $this->route->parameter('service') === 'system' &&
-            $this->route->hasParameter('resource') &&
-            $this->route->parameter('resource') === 'admin/session';
+        return $this->route->hasParameter('resource') &&
+            strpos($this->route->parameter('resource'), 'session') !== false;
     }
 }

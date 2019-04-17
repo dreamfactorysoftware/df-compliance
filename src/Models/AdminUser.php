@@ -19,19 +19,38 @@ class AdminUser extends CoreAdminUser
     }
 
     /**
+     * Does Admin with given id exists.
+     *
+     * @param $id
+     * @return bool
+     */
+    public static function adminExistsById($id)
+    {
+        return self::where(['id' => $id, 'is_sys_admin' => true])->exists();
+    }
+
+    /**
      * Set given admin as root.
      *
      * @param $admin
      * @return bool
      */
-    public static function setRoot($admin)
+    public static function makeRoot($admin)
     {
-        if (!$admin->is_sys_admin) {
-            throw new ForbiddenException('Only admins can be root.');
-        } else {
-            $admin->is_root_admin = true;
-            return $admin;
-        }
+        $admin->is_root_admin = true;
+        return $admin;
+    }
+
+    /**
+     * Unset given admin as root.
+     *
+     * @param $admin
+     * @return bool
+     */
+    public static function unsetRoot($admin)
+    {
+        $admin->is_root_admin = false;
+        return $admin;
     }
 
     /**

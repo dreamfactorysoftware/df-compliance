@@ -2,6 +2,7 @@
 
 namespace DreamFactory\Core\Compliance;
 
+use DreamFactory\Core\Compliance\Commands\RootAdmin;
 use DreamFactory\Core\Compliance\Handlers\Events\EventHandler;
 use DreamFactory\Core\Compliance\Http\Middleware\AccessibleTabs;
 use DreamFactory\Core\Compliance\Http\Middleware\HandleRestrictedAdmin;
@@ -21,8 +22,9 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
 
         Event::subscribe(new EventHandler());
-      
+
         $this->addMiddleware();
+        $this->addCommands();
     }
 
     /**
@@ -47,5 +49,17 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
         Route::pushMiddlewareToGroup('df.api', 'df.mark_root_admin');
         Route::pushMiddlewareToGroup('df.api', 'df.handle_restricted_admin');
         Route::pushMiddlewareToGroup('df.api', 'df.accessible_tabs');
+    }
+
+    /**
+     * Register compliance commands.
+     *
+     * @return void
+     */
+    protected function addCommands()
+    {
+        $this->commands([
+            RootAdmin::class,
+        ]);
     }
 }

@@ -37,7 +37,7 @@ class MarkAsRootAdmin
     }
 
     /**
-     * Does request goes to admin/session
+     * Does request go to admin/session
      *
      * @return bool
      */

@@ -29,24 +29,24 @@ class HandleRestrictedAdmin
      */
     function handle($request, Closure $next)
     {
-        // Ignore Restricted admin logic for non GOLD subscription
-        if (Environment::getLicenseLevel() !== LicenseLevel::GOLD) {
-            throw new ForbiddenException('Compliance is not available for your license. Please upgrade to Gold.');
-        };
-
         $this->request = $request;
         $this->route = $request->route();
         $this->method = $request->getMethod();
         $this->payload = $request->input();
 
+        if (!$this->isValidLicense()) {
+            throw new ForbiddenException('Compliance is not available for your license. Please upgrade to Gold.');
+        };
+
         if ($this->isRestrictedAdminRequest()) {
             $this->handleRestrictedAdminRequest();
-        };
+        }
+
         return $next($request);
     }
 
     /**
-     * Is request goest to system/admin/* endpoint (except system/admin/session)
+     * Does request go to system/admin/* endpoint (except system/admin/session)
      *
      * @return bool
      */
@@ -57,7 +57,18 @@ class HandleRestrictedAdmin
             $this->route->parameter('service') === 'system' &&
             $this->route->hasParameter('resource') &&
             strpos($this->route->parameter('resource'), 'admin') !== false &&
-            strpos($this->route->parameter('resource'), 'session') === false;
+            strpos($this->route->parameter('resource'), 'session') === false &&
+            $this->isRestrictedAdmin();
+    }
+
+    /**
+     * Is Gold licence
+     *
+     * @return bool
+     */
+    private function isValidLicense()
+    {
+        return Environment::getLicenseLevel() === LicenseLevel::GOLD;
     }
 
     /**
@@ -100,7 +111,7 @@ class HandleRestrictedAdmin
      */
     private function handleAdminRole($requestData)
     {
-        $isRestrictedAdmin = $this->isRestrictedAdmin($requestData);
+        $isRestrictedAdmin = $this->isRestrictedAdmin();
         $accessByTabs = $this->getAccessTabs($requestData);
         $restrictedAdminHelper = new RestrictedAdmin($requestData["email"], $accessByTabs);
         $notAllTabsSelected = !RestrictedAdmin::isAllTabs($accessByTabs);
@@ -136,7 +147,7 @@ class HandleRestrictedAdmin
      */
     private function getAdminData($requestData, $roleId)
     {
-        $isRestrictedAdmin = $this->isRestrictedAdmin($requestData);
+        $isRestrictedAdmin = $this->isRestrictedAdmin();
         $accessByTabs = $this->getAccessTabs($requestData);
         $notAllTabsSelected = !RestrictedAdmin::isAllTabs($accessByTabs);
 
@@ -151,12 +162,20 @@ class HandleRestrictedAdmin
     }
 
     /**
-     * @param $requestData
      * @return bool
      */
-    private function isRestrictedAdmin($requestData)
+    private function isRestrictedAdmin()
     {
-        return isset($requestData["is_restricted_admin"]) && $requestData["is_restricted_admin"];
+        if (isset($this->payload['resource'])) {
+            foreach ($this->payload['resource'] as $key => $adminData) {
+                if (isset($adminData["is_restricted_admin"]) && $adminData['is_restricted_admin']) {
+                    return true;
+                }
+            }
+            return false;
+        } else {
+            return isset($this->payload["is_restricted_admin"]) && $this->payload["is_restricted_admin"];
+        }
     }
 
     /**

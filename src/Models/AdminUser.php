@@ -2,8 +2,8 @@
 
 namespace DreamFactory\Core\Compliance\Models;
 
-use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Models\AdminUser as CoreAdminUser;
+use DreamFactory\Core\Exceptions\ForbiddenException;
 
 class AdminUser extends CoreAdminUser
 {
@@ -64,4 +64,19 @@ class AdminUser extends CoreAdminUser
         return AdminUser::whereId($id)->first()->is_root_admin;
     }
 
+    /**
+     * Unset given admin as root.
+     *
+     * @param $admin
+     * @return bool
+     */
+    public static function unsetRoot($admin)
+    {
+        if (!$admin->is_sys_admin) {
+            throw new ForbiddenException('Only admins can be root.');
+        } else {
+            $admin->is_root_admin = false;
+            return $admin;
+        }
+    }
 }

@@ -5,7 +5,6 @@ namespace DreamFactory\Core\Compliance\Models;
 use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Models\AdminUser as CoreAdminUser;
 
-
 class AdminUser extends CoreAdminUser
 {
     /**
@@ -34,4 +33,16 @@ class AdminUser extends CoreAdminUser
             return $admin;
         }
     }
+
+    /**
+     * Get is_root_admin of the admin with given id
+     *
+     * @param $id
+     * @return bool|AdminUser
+     */
+    public static function isRootById($id)
+    {
+        return AdminUser::whereId($id)->first()->is_root_admin;
+    }
+
 }

@@ -4,8 +4,8 @@ namespace DreamFactory\Core\Compliance\Http\Middleware;
 
 use Closure;
 use DreamFactory\Core\Compliance\Components\RestrictedAdmin;
-use DreamFactory\Core\Utility\Environment;
-use DreamFactory\Core\Enums\LicenseLevel;
+use DreamFactory\Core\Compliance\Models\AdminUser;
+use DreamFactory\Core\Compliance\Utility\LicenseCheck;
 use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Enums\Verbs;
 
@@ -34,14 +34,16 @@ class HandleRestrictedAdmin
         $this->method = $request->getMethod();
         $this->payload = $request->input();
 
-        if (!$this->isValidLicense()) {
-            throw new ForbiddenException('Compliance is not available for your license. Please upgrade to Gold.');
-        };
-
         if ($this->isRestrictedAdminRequest()) {
+            if (!LicenseCheck::isValidLicense() && AdminUser::isCurrentUserRootAdmin()) {
+                throw new ForbiddenException('Restricted admins are not available for your license. Please upgrade to Gold.');
+            }
+            if (!AdminUser::isCurrentUserRootAdmin()) {
+                return $next($request);
+            };
+
             $this->handleRestrictedAdminRequest();
         }
-
         return $next($request);
     }
 
@@ -59,16 +61,6 @@ class HandleRestrictedAdmin
             strpos($this->route->parameter('resource'), 'admin') !== false &&
             strpos($this->route->parameter('resource'), 'session') === false &&
             $this->isRestrictedAdmin();
-    }
-
-    /**
-     * Is Gold licence
-     *
-     * @return bool
-     */
-    private function isValidLicense()
-    {
-        return Environment::getLicenseLevel() === LicenseLevel::GOLD;
     }
 
     /**

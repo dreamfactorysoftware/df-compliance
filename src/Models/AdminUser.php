@@ -2,6 +2,7 @@
 
 namespace DreamFactory\Core\Compliance\Models;
 
+use DreamFactory\Core\Utility\Session;
 use DreamFactory\Core\Models\AdminUser as CoreAdminUser;
 use DreamFactory\Core\Exceptions\ForbiddenException;
 
@@ -27,6 +28,18 @@ class AdminUser extends CoreAdminUser
     public static function adminExistsById($id)
     {
         return self::where(['id' => $id, 'is_sys_admin' => true])->exists();
+    }
+
+    /**
+     * Does logged in user is root admin.
+     *
+     * @return bool
+     */
+    public static function isCurrentUserRootAdmin()
+    {
+        $currentUser = self::whereId(Session::getCurrentUserId())->first();
+        $isRootAdmin = isset($currentUser['is_root_admin']) ? $currentUser->is_root_admin : false;
+        return $isRootAdmin;
     }
 
     /**

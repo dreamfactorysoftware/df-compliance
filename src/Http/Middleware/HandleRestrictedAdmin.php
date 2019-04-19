@@ -36,7 +36,7 @@ class HandleRestrictedAdmin
         $this->payload = $request->input();
 
         if ($this->isRestrictedAdminRequest() && AdminUser::isCurrentUserRootAdmin()) {
-            if (!LicenseCheck::isValidLicense()) {
+            if (!LicenseCheck::isGoldLicense()) {
                 throw new ForbiddenException('Restricted admins are not available for your license. Please upgrade to Gold.');
             };
 

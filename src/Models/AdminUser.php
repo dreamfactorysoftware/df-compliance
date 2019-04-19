@@ -38,8 +38,7 @@ class AdminUser extends CoreAdminUser
     public static function isCurrentUserRootAdmin()
     {
         $currentUser = self::whereId(Session::getCurrentUserId())->first();
-        $isRootAdmin = isset($currentUser['is_root_admin']) ? $currentUser->is_root_admin : false;
-        return $isRootAdmin;
+        return $currentUser->is_root_admin;
     }
 
     /**

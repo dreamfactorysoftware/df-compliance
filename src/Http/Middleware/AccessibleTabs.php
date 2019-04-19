@@ -22,7 +22,7 @@ class AccessibleTabs
     function handle($request, Closure $next)
     {
         // Ignore Restricted admin logic for non GOLD subscription
-        if (!LicenseCheck::isValidLicense() || !AdminUser::isCurrentUserRootAdmin()) {
+        if (!LicenseCheck::isGoldLicense() || !AdminUser::isCurrentUserRootAdmin()) {
             return $next($request);
         }
 

@@ -4,6 +4,8 @@ namespace DreamFactory\Core\Compliance\Http\Middleware;
 
 use Closure;
 use DreamFactory\Core\Compliance\Components\RestrictedAdmin;
+use DreamFactory\Core\Compliance\Models\AdminUser;
+use DreamFactory\Core\Compliance\Utility\LicenseCheck;
 use DreamFactory\Core\Utility\Environment;
 use DreamFactory\Core\Enums\LicenseLevel;
 
@@ -20,17 +22,19 @@ class AccessibleTabs
     function handle($request, Closure $next)
     {
         // Ignore Restricted admin logic for non GOLD subscription
-        if(Environment::getLicenseLevel() !== LicenseLevel::GOLD) {
+        if (!LicenseCheck::isGoldLicense() || !AdminUser::isCurrentUserRootAdmin()) {
             return $next($request);
-        };
+        }
 
         $response = $next($request);
         $route = $request->route();
         $method = $request->getMethod();
+
         if ($this->isGetRoleRequest($route, $method) && $this->isAccessibleTabsSpecified($request->only('accessible_tabs'))) {
             $content = $this->getContentWithAccessibleTabs($response->getOriginalContent());
             $response->setContent($content);
         };
+
         return $response;
     }
 

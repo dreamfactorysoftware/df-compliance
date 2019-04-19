@@ -12,7 +12,7 @@ class LicenseCheck
      *
      * @return bool
      */
-    public static function isValidLicense()
+    public static function isGoldLicense()
     {
         return Environment::getLicenseLevel() === LicenseLevel::GOLD;
     }

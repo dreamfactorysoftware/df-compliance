@@ -85,7 +85,7 @@ class HandleRestrictedAdmin
             $this->route->parameter('service') === 'system' &&
             $this->route->hasParameter('resource') &&
             strpos($this->route->parameter('resource'), 'role') !== false &&
-            $this->isRestrictedAdminRoles($roleIds);
+            $this->isRestrictedAdminRolesByIds($roleIds);
     }
 
     /**
@@ -94,10 +94,10 @@ class HandleRestrictedAdmin
      * @param $roleIds
      * @return boolean
      */
-    protected function isRestrictedAdminRoles($roleIds)
+    protected function isRestrictedAdminRolesByIds($roleIds)
     {
         foreach ($roleIds as $roleId) {
-            if (UserAppRole::whereRoleId($roleId)->exists() && AdminUser::adminExistsById($this->getUserIdFromUserAppRole($roleId))) {
+            if ($this->isRestrictedAdminRole($roleId)) {
                 return true;
             }
         };
@@ -241,6 +241,18 @@ class HandleRestrictedAdmin
      */
     protected function getUserIdFromUserAppRole($roleId)
     {
+        dd(UserAppRole::whereRoleId($roleId)->get()->user_id);
         return UserAppRole::whereRoleId($roleId)->get()->toArray()[0]['user_id'];
+    }
+
+    /**
+     * Is role with this id belongs to a restricted admin
+     *
+     * @param $roleId
+     * @return bool
+     */
+    protected function isRestrictedAdminRole($roleId)
+    {
+        return UserAppRole::whereRoleId($roleId)->exists() && AdminUser::adminExistsById($this->getUserIdFromUserAppRole($roleId));
     }
 }

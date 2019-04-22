@@ -5,6 +5,7 @@ namespace DreamFactory\Core\Compliance\Http\Middleware;
 use DreamFactory\Core\Compliance\Components\RestrictedAdmin;
 use DreamFactory\Core\Compliance\Models\AdminUser;
 use DreamFactory\Core\Compliance\Utility\LicenseCheck;
+use DreamFactory\Core\Compliance\Utility\MiddlewareHelper;
 use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Enums\Verbs;
 use Illuminate\Support\Str;
@@ -52,8 +53,8 @@ class HandleRestrictedAdmin
     private function isRestrictedAdminRequest()
     {
         return in_array($this->method, self::RESTRICTED_ADMIN_METHODS) &&
-            Str::contains($this->request->url(), 'system/admin') &&
-            !Str::contains($this->request->url(), 'session') &&
+            MiddlewareHelper::requestUrlContains($this->request, 'system/admin') &&
+            !MiddlewareHelper::requestUrlContains($this->request, 'session') &&
             $this->isRestrictedAdmin();
     }
 

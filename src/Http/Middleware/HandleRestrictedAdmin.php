@@ -58,22 +58,6 @@ class HandleRestrictedAdmin
     }
 
     /**
-     * Does any role belong to any RA
-     *
-     * @param $roleIds
-     * @return boolean
-     */
-    protected function isRestrictedAdminRolesByIds($roleIds)
-    {
-        foreach ($roleIds as $roleId) {
-            if ($this->isRestrictedAdminRole($roleId)) {
-                return true;
-            }
-        };
-        return false;
-    }
-
-    /**
      * Replace request payload with restricted admin role linked to the admin
      *
      * @return void

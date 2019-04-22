@@ -5,21 +5,21 @@ namespace DreamFactory\Core\Compliance\Http\Middleware;
 use DreamFactory\Core\Compliance\Components\RestrictedAdmin;
 use DreamFactory\Core\Compliance\Models\AdminUser;
 use DreamFactory\Core\Compliance\Utility\LicenseCheck;
+use DreamFactory\Core\Compliance\Utility\MiddlewareHelper;
 use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Enums\Verbs;
+use Illuminate\Support\Str;
 
 use Closure;
 
 class HandleRestrictedAdmin
 {
-
     // Request methods restricted admin logic use
     const RESTRICTED_ADMIN_METHODS = [Verbs::POST, Verbs::PUT, Verbs::PATCH];
 
     private $method;
     private $payload;
     private $request;
-    private $route;
 
     /**
      * @param         $request
@@ -31,7 +31,6 @@ class HandleRestrictedAdmin
     function handle($request, Closure $next)
     {
         $this->request = $request;
-        $this->route = $request->route();
         $this->method = $request->getMethod();
         $this->payload = $request->input();
 
@@ -54,11 +53,8 @@ class HandleRestrictedAdmin
     private function isRestrictedAdminRequest()
     {
         return in_array($this->method, self::RESTRICTED_ADMIN_METHODS) &&
-            $this->route->hasParameter('service') &&
-            $this->route->parameter('service') === 'system' &&
-            $this->route->hasParameter('resource') &&
-            strpos($this->route->parameter('resource'), 'admin') !== false &&
-            strpos($this->route->parameter('resource'), 'session') === false &&
+            MiddlewareHelper::requestUrlContains($this->request, 'system/admin') &&
+            !MiddlewareHelper::requestUrlContains($this->request, 'session') &&
             $this->isRestrictedAdmin();
     }
 

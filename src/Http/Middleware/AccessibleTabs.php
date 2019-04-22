@@ -4,13 +4,15 @@ namespace DreamFactory\Core\Compliance\Http\Middleware;
 
 use Closure;
 use DreamFactory\Core\Compliance\Components\RestrictedAdmin;
-use DreamFactory\Core\Compliance\Models\AdminUser;
 use DreamFactory\Core\Compliance\Utility\LicenseCheck;
-use DreamFactory\Core\Utility\Environment;
-use DreamFactory\Core\Enums\LicenseLevel;
+use DreamFactory\Core\Compliance\Utility\MiddlewareHelper;
+use DreamFactory\Core\Enums\Verbs;
+use Illuminate\Support\Str;
 
 class AccessibleTabs
 {
+
+    protected $request;
 
     /**
      * @param         $request
@@ -21,16 +23,17 @@ class AccessibleTabs
      */
     function handle($request, Closure $next)
     {
+        $this->request = $request;
+
         // Ignore Restricted admin logic for non GOLD subscription
-        if (!LicenseCheck::isGoldLicense() || !AdminUser::isCurrentUserRootAdmin()) {
-            return $next($request);
+        if (!LicenseCheck::isGoldLicense()) {
+            return $next($this->request);
         }
 
-        $response = $next($request);
-        $route = $request->route();
-        $method = $request->getMethod();
+        $response = $next($this->request);
+        $method = $this->request->getMethod();
 
-        if ($this->isGetRoleRequest($route, $method) && $this->isAccessibleTabsSpecified($request->only('accessible_tabs'))) {
+        if ($this->isGetAccessibleTabsRequest($method)) {
             $content = $this->getContentWithAccessibleTabs($response->getOriginalContent());
             $response->setContent($content);
         };
@@ -39,17 +42,14 @@ class AccessibleTabs
     }
 
     /**
-     * @param $route
      * @param $method
      * @return bool
      */
-    private function isGetRoleRequest($route, $method)
+    private function isGetAccessibleTabsRequest($method)
     {
-        return $method === "GET" &&
-            $route->hasParameter('service') &&
-            $route->parameter('service') === 'system' &&
-            $route->hasParameter('resource') &&
-            strpos($route->parameter('resource'), 'role') !== false;
+        return $method === Verbs::GET &&
+            MiddlewareHelper::requestUrlContains($this->request, 'system/role') &&
+            $this->isAccessibleTabsSpecified($this->request->only('accessible_tabs'));
     }
 
     /**

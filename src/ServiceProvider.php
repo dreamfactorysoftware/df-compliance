@@ -40,13 +40,13 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
             Route::aliasMiddleware('df.mark_root_admin', MarkAsRootAdmin::class);
             Route::aliasMiddleware('df.handle_restricted_admin', HandleRestrictedAdmin::class);
             Route::aliasMiddleware('df.accessible_tabs', AccessibleTabs::class);
-            Route::aliasMiddleware('df.accessible_tabs', HandleRestrictedAdminRole::class);
+            Route::aliasMiddleware('df.handle_restricted_admin_role', HandleRestrictedAdminRole::class);
         } else {
             /** @noinspection PhpUndefinedMethodInspection */
             Route::middleware('df.mark_root_admin', MarkAsRootAdmin::class);
             Route::middleware('df.handle_restricted_admin', HandleRestrictedAdmin::class);
             Route::middleware('df.accessible_tabs', AccessibleTabs::class);
-            Route::middleware('df.accessible_tabs', HandleRestrictedAdminRole::class);
+            Route::middleware('df.handle_restricted_admin_role', HandleRestrictedAdminRole::class);
         }
 
         Route::pushMiddlewareToGroup('df.api', 'df.mark_root_admin');

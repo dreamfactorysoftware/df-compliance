@@ -7,7 +7,7 @@ use DreamFactory\Core\Compliance\Models\AdminUser;
 use DreamFactory\Core\Models\UserAppRole;
 use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Enums\Verbs;
-
+use Illuminate\Support\Str;
 
 class HandleRestrictedAdminRole
 {
@@ -48,7 +48,7 @@ class HandleRestrictedAdminRole
         }
 
         return $this->request->getMethod() === Verbs::DELETE &&
-            strpos($this->request->url(), 'system/role') !== false &&
+            Str::contains($this->request->url(), 'system/role') &&
             $this->isRestrictedAdminRolesByIds($roleIds);
     }
 

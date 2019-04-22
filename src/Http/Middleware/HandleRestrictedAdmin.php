@@ -7,6 +7,7 @@ use DreamFactory\Core\Compliance\Models\AdminUser;
 use DreamFactory\Core\Compliance\Utility\LicenseCheck;
 use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Enums\Verbs;
+use Illuminate\Support\Str;
 
 use Closure;
 
@@ -53,8 +54,8 @@ class HandleRestrictedAdmin
     private function isRestrictedAdminRequest()
     {
         return in_array($this->method, self::RESTRICTED_ADMIN_METHODS) &&
-            strpos($this->request->url(), 'system/admin') !== false &&
-            strpos($this->request->url(), 'session') === false &&
+            Str::contains($this->request->url(), 'system/admin') &&
+            Str::contains($this->request->url(), 'session') &&
             $this->isRestrictedAdmin();
     }
 

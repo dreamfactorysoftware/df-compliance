@@ -5,6 +5,7 @@ namespace DreamFactory\Core\Compliance\Http\Middleware;
 use Closure;
 use DreamFactory\Core\Compliance\Components\RestrictedAdmin;
 use DreamFactory\Core\Compliance\Utility\LicenseCheck;
+use DreamFactory\Core\Enums\Verbs;
 
 class AccessibleTabs
 {
@@ -28,10 +29,9 @@ class AccessibleTabs
         }
 
         $response = $next($this->request);
-        $route = $this->request->route();
         $method = $this->request->getMethod();
 
-        if ($this->isGetAccessibleTabsRequest($route, $method)) {
+        if ($this->isGetAccessibleTabsRequest($method)) {
             $content = $this->getContentWithAccessibleTabs($response->getOriginalContent());
             $response->setContent($content);
         };
@@ -40,17 +40,13 @@ class AccessibleTabs
     }
 
     /**
-     * @param $route
      * @param $method
      * @return bool
      */
-    private function isGetAccessibleTabsRequest($route, $method)
+    private function isGetAccessibleTabsRequest($method)
     {
-        return $method === "GET" &&
-            $route->hasParameter('service') &&
-            $route->parameter('service') === 'system' &&
-            $route->hasParameter('resource') &&
-            strpos($route->parameter('resource'), 'role') !== false &&
+        return $method === Verbs::GET &&
+            strpos($this->request->url(), 'system/role') !== false &&
             $this->isAccessibleTabsSpecified($this->request->only('accessible_tabs'));
     }
 

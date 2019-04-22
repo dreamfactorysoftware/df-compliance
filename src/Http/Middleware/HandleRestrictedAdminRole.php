@@ -6,6 +6,8 @@ use Closure;
 use DreamFactory\Core\Compliance\Models\AdminUser;
 use DreamFactory\Core\Models\UserAppRole;
 use DreamFactory\Core\Exceptions\ForbiddenException;
+use DreamFactory\Core\Enums\Verbs;
+
 
 class HandleRestrictedAdminRole
 {

@@ -6,6 +6,7 @@ namespace DreamFactory\Core\Compliance\Http\Middleware;
 use Closure;
 use DreamFactory\Core\Compliance\Models\AdminUser;
 use DreamFactory\Core\Enums\Verbs;
+use Illuminate\Support\Str;
 
 class MarkAsRootAdmin
 {
@@ -43,7 +44,6 @@ class MarkAsRootAdmin
      */
     private function isAdminSessionRequest()
     {
-        return $this->route->hasParameter('resource') &&
-            strpos($this->route->parameter('resource'), 'session') !== false;
+        return Str::contains($this->request->url(), 'session');
     }
 }

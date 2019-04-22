@@ -6,6 +6,7 @@ use Closure;
 use DreamFactory\Core\Compliance\Components\RestrictedAdmin;
 use DreamFactory\Core\Compliance\Utility\LicenseCheck;
 use DreamFactory\Core\Enums\Verbs;
+use Illuminate\Support\Str;
 
 class AccessibleTabs
 {
@@ -46,7 +47,7 @@ class AccessibleTabs
     private function isGetAccessibleTabsRequest($method)
     {
         return $method === Verbs::GET &&
-            strpos($this->request->url(), 'system/role') !== false &&
+            Str::contains($this->request->url(), 'system/role') &&
             $this->isAccessibleTabsSpecified($this->request->only('accessible_tabs'));
     }
 

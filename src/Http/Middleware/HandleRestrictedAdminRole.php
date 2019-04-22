@@ -4,6 +4,7 @@ namespace DreamFactory\Core\Compliance\Http\Middleware;
 
 use Closure;
 use DreamFactory\Core\Compliance\Models\AdminUser;
+use DreamFactory\Core\Compliance\Utility\MiddlewareHelper;
 use DreamFactory\Core\Models\UserAppRole;
 use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Enums\Verbs;
@@ -48,7 +49,7 @@ class HandleRestrictedAdminRole
         }
 
         return $this->request->getMethod() === Verbs::DELETE &&
-            Str::contains($this->request->url(), 'system/role') &&
+            MiddlewareHelper::requestUrlContains($this->request, 'system/role') &&
             $this->isRestrictedAdminRolesByIds($roleIds);
     }
 

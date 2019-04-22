@@ -5,6 +5,7 @@ namespace DreamFactory\Core\Compliance\Http\Middleware;
 use Closure;
 use DreamFactory\Core\Compliance\Components\RestrictedAdmin;
 use DreamFactory\Core\Compliance\Utility\LicenseCheck;
+use DreamFactory\Core\Compliance\Utility\MiddlewareHelper;
 use DreamFactory\Core\Enums\Verbs;
 use Illuminate\Support\Str;
 
@@ -47,7 +48,7 @@ class AccessibleTabs
     private function isGetAccessibleTabsRequest($method)
     {
         return $method === Verbs::GET &&
-            Str::contains($this->request->url(), 'system/role') &&
+            MiddlewareHelper::requestUrlContains($this->request, 'system/role') &&
             $this->isAccessibleTabsSpecified($this->request->only('accessible_tabs'));
     }
 

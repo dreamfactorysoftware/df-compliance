@@ -5,6 +5,7 @@ namespace DreamFactory\Core\Compliance\Http\Middleware;
 
 use Closure;
 use DreamFactory\Core\Compliance\Models\AdminUser;
+use DreamFactory\Core\Compliance\Utility\MiddlewareHelper;
 use DreamFactory\Core\Enums\Verbs;
 use Illuminate\Support\Str;
 
@@ -44,6 +45,6 @@ class MarkAsRootAdmin
      */
     private function isSessionRequest()
     {
-        return Str::contains($this->request->url(), 'session');
+        return MiddlewareHelper::requestUrlContains($this->request, 'session');
     }
 }

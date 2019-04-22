@@ -13,7 +13,6 @@ use Closure;
 
 class HandleRestrictedAdmin
 {
-
     // Request methods restricted admin logic use
     const RESTRICTED_ADMIN_METHODS = [Verbs::POST, Verbs::PUT, Verbs::PATCH];
 
@@ -68,7 +67,7 @@ class HandleRestrictedAdmin
     }
 
     /**
-     * Is request goes to system/role/* endpoint
+     * Does request go to system/role/* endpoint
      *
      * @return bool
      */
@@ -77,7 +76,7 @@ class HandleRestrictedAdmin
         $roleIds = $this->getResourceId();
 
         if (count($roleIds) === 0) {
-            $roleIds = $this->request->input('ids') ? explode(',', $this->request->input('ids')) : [];
+            $roleIds = $this->getIdsParameter();
         }
 
         return $this->method === Verbs::DELETE &&
@@ -89,7 +88,7 @@ class HandleRestrictedAdmin
     }
 
     /**
-     * Is any role belong to any RA
+     * Does any role belong to any RA
      *
      * @param $roleIds
      * @return boolean
@@ -241,12 +240,11 @@ class HandleRestrictedAdmin
      */
     protected function getUserIdFromUserAppRole($roleId)
     {
-        dd(UserAppRole::whereRoleId($roleId)->get()->user_id);
         return UserAppRole::whereRoleId($roleId)->get()->toArray()[0]['user_id'];
     }
 
     /**
-     * Is role with this id belongs to a restricted admin
+     * Does role with this id belong to a restricted admin
      *
      * @param $roleId
      * @return bool
@@ -254,5 +252,15 @@ class HandleRestrictedAdmin
     protected function isRestrictedAdminRole($roleId)
     {
         return UserAppRole::whereRoleId($roleId)->exists() && AdminUser::adminExistsById($this->getUserIdFromUserAppRole($roleId));
+    }
+
+    /**
+     * Get ?ids= parameter
+     *
+     * @return array
+     */
+    private function getIdsParameter()
+    {
+        return $this->request->input('ids') ? explode(',', $this->request->input('ids')) : [];
     }
 }

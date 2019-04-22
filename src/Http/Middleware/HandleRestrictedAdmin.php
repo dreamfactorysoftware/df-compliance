@@ -19,7 +19,6 @@ class HandleRestrictedAdmin
     private $method;
     private $payload;
     private $request;
-    private $route;
 
     /**
      * @param         $request
@@ -31,7 +30,6 @@ class HandleRestrictedAdmin
     function handle($request, Closure $next)
     {
         $this->request = $request;
-        $this->route = $request->route();
         $this->method = $request->getMethod();
         $this->payload = $request->input();
 

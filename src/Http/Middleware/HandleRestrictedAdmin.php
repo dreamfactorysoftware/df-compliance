@@ -53,24 +53,8 @@ class HandleRestrictedAdmin
     {
         return in_array($this->method, self::RESTRICTED_ADMIN_METHODS) &&
             Str::contains($this->request->url(), 'system/admin') &&
-            Str::contains($this->request->url(), 'session') &&
+            !Str::contains($this->request->url(), 'session') &&
             $this->isRestrictedAdmin();
-    }
-
-    /**
-     * Does any role belong to any RA
-     *
-     * @param $roleIds
-     * @return boolean
-     */
-    protected function isRestrictedAdminRolesByIds($roleIds)
-    {
-        foreach ($roleIds as $roleId) {
-            if ($this->isRestrictedAdminRole($roleId)) {
-                return true;
-            }
-        };
-        return false;
     }
 
     /**

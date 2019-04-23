@@ -36,7 +36,7 @@ class ServiceLevelAudit
         $this->request = $request;
 
         if ($this->isServiceReportRequest()) {
-            if (!LicenseCheck::isValidLicense() && AdminUser::isCurrentUserRootAdmin()) {
+            if (!LicenseCheck::isGoldLicense() && AdminUser::isCurrentUserRootAdmin()) {
                 throw new ForbiddenException('Service reports are not available for your license. Please upgrade to Gold.');
             } elseif (!AdminUser::isCurrentUserRootAdmin()) {
                 throw new ForbiddenException('Service Reports only available for root admin.');

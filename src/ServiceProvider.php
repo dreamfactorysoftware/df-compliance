@@ -4,11 +4,17 @@ namespace DreamFactory\Core\Compliance;
 
 use DreamFactory\Core\Compliance\Commands\RootAdmin as RootAdminCommand;
 use DreamFactory\Core\Compliance\Handlers\Events\EventHandler;
+use DreamFactory\Core\Compliance\Resources\System\ServiceReport;
+use DreamFactory\Core\System\Components\SystemResourceManager;
+use DreamFactory\Core\Enums\LicenseLevel;
+use DreamFactory\Core\System\Components\SystemResourceType;
 use DreamFactory\Core\Compliance\Http\Middleware\AccessibleTabs;
 use DreamFactory\Core\Compliance\Http\Middleware\HandleRestrictedAdmin;
 use DreamFactory\Core\Compliance\Http\Middleware\HandleRestrictedAdminRole;
 use DreamFactory\Core\Compliance\Http\Middleware\MarkAsRootAdmin;
+use DreamFactory\Core\Compliance\Http\Middleware\ServiceLevelAudit;
 use Illuminate\Routing\Router;
+
 use Route;
 use Event;
 
@@ -26,6 +32,22 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
 
         $this->addMiddleware();
         $this->addCommands();
+    }
+
+    public function register(){
+        $this->app->resolving('df.system.resource', function (SystemResourceManager $df) {
+            $df->addType(
+                new SystemResourceType([
+                    'name'                  => 'service_report',
+                    'label'                 => 'Service Reports',
+                    'description'           => 'Allows management of service report(s).',
+                    'class_name'            => ServiceReport::class,
+                    'subscription_required' => LicenseLevel::GOLD,
+                    'singleton'             => false,
+                    'read_only'             => false,
+                ])
+            );
+        });
     }
 
     /**

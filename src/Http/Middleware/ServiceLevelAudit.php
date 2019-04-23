@@ -5,8 +5,8 @@ namespace DreamFactory\Core\Compliance\Http\Middleware;
 use DreamFactory\Core\Compliance\Models\AdminUser;
 use DreamFactory\Core\Compliance\Models\ServiceReport;
 use DreamFactory\Core\Compliance\Utility\LicenseCheck;
+use DreamFactory\Core\Compliance\Utility\MiddlewareHelper;
 use DreamFactory\Core\Utility\Session;
-use DreamFactory\Core\Utility\ResourcesWrapper;
 use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Enums\Verbs;
 
@@ -30,21 +30,14 @@ class ServiceLevelAudit
      */
     public function handle($request, Closure $next)
     {
-        $this->route = $request->route();
         $this->method = $request->getMethod();
         $this->payload = $request->input();
         $this->request = $request;
 
-        if ($this->isServiceReportRequest()) {
-            if (!LicenseCheck::isGoldLicense() && AdminUser::isCurrentUserRootAdmin()) {
-                throw new ForbiddenException('Service reports are not available for your license. Please upgrade to Gold.');
-            } elseif (!AdminUser::isCurrentUserRootAdmin()) {
-                throw new ForbiddenException('Service Reports only available for root admin.');
-            }
-        }
+        $this->validateServiceReportRequest();
 
         if ($this->isServiceRequest()) {
-            $this->resource = $this->route->parameter('resource');
+            $this->resource = $this->request->route()->parameter('resource');
             $serviceReportsData = $this->getReportsData();
             $response = $next($request);
 
@@ -57,16 +50,21 @@ class ServiceLevelAudit
     }
 
     /**
-     * Is request goes to system/service_report
+     * Does user has permission to use system/service_report endpoint
      *
-     * @return bool
+     * @return void
      */
-    private function isServiceReportRequest()
+    private function validateServiceReportRequest()
     {
-        return $this->route->hasParameter('service') &&
-            $this->route->parameter('service') === 'system' &&
-            $this->route->hasParameter('resource') &&
-            strpos($this->route->parameter('resource'), 'service_report') !== false;
+        if(MiddlewareHelper::requestUrlContains($this->request, 'system/service_report')){
+            if (!AdminUser::isCurrentUserRootAdmin()) {
+                throw new ForbiddenException('Service Reports only available for root admin.');
+            }
+
+            if (!LicenseCheck::isGoldLicense()) {
+                throw new ForbiddenException('Service reports are not available for your license. Please upgrade to Gold.');
+            }
+        };
     }
 
     /**
@@ -76,11 +74,8 @@ class ServiceLevelAudit
      */
     protected function isServiceRequest()
     {
-        return $this->route->hasParameter('service') &&
-            $this->route->parameter('service') === 'system' &&
-            $this->route->hasParameter('resource') &&
-            strpos($this->route->parameter('resource'), 'service') !== false &&
-            $this->method !== Verbs::GET;
+        return $this->method !== Verbs::GET &&
+               MiddlewareHelper::requestUrlContains($this->request, 'system/service');
     }
 
     /**
@@ -166,9 +161,7 @@ class ServiceLevelAudit
     protected function getUserEmail()
     {
         $user = Session::user();
-        $userEmail = '';
-        if ($user) $user = $user->toArray();
-        if (isset($user['email'])) $userEmail = $user['email'];
+        $userEmail = $user->email;
         return $userEmail;
     }
 

@@ -7,9 +7,8 @@ use Closure;
 use DreamFactory\Core\Compliance\Models\AdminUser;
 use DreamFactory\Core\Compliance\Utility\MiddlewareHelper;
 
-class MarkAsRootAdmin
+class DoesRootAdminExist
 {
-    private $method;
     private $request;
 
     /**
@@ -22,15 +21,14 @@ class MarkAsRootAdmin
     function handle($request, Closure $next)
     {
         $this->request = $request;
-        $this->method = $request->getMethod();
         $response = $next($request);
 
-        if (!$this->isSessionRequest()) {
+        if (!$this->isEnvironmentRequest()) {
             return $response;
         }
 
         $content = $response->getOriginalContent();
-        $content['is_root_admin'] = isset($content['id']) && AdminUser::isRootById($content['id']);
+        $content['platform']['root_admin_exists'] = AdminUser::doesRootAdminExist();
         $response->setContent($content);
 
         return $response;
@@ -41,8 +39,8 @@ class MarkAsRootAdmin
      *
      * @return bool
      */
-    private function isSessionRequest()
+    private function isEnvironmentRequest()
     {
-        return MiddlewareHelper::requestUrlContains($this->request, 'session');
+        return MiddlewareHelper::requestUrlContains($this->request, 'environment');
     }
 }

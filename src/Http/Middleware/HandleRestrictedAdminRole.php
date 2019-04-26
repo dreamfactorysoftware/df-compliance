@@ -29,7 +29,7 @@ class HandleRestrictedAdminRole
         $this->route = $request->route();
 
         if ($this->isDeleteRestrictedAdminRoleRequest() && !AdminUser::isCurrentUserRootAdmin()) {
-            throw new ForbiddenException('You do not have permission to delete restricted admin\'s role. Please contact your root administrator.');
+            throw new ForbiddenException('You do not have permission to restricted admin roles. Please contact your root administrator.');
         }
 
         return $next($this->request);
@@ -48,8 +48,7 @@ class HandleRestrictedAdminRole
             $roleIds = $this->getIdsParameter();
         }
 
-        return $this->request->getMethod() === Verbs::DELETE &&
-            MiddlewareHelper::requestUrlContains($this->request, 'system/role') &&
+        return MiddlewareHelper::requestUrlContains($this->request, 'system/role') &&
             $this->isRestrictedAdminRolesByIds($roleIds);
     }
 

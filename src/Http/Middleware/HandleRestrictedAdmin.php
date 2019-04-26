@@ -34,7 +34,15 @@ class HandleRestrictedAdmin
         $this->method = $request->getMethod();
         $this->payload = $request->input();
 
-        if ($this->isRestrictedAdminRequest() && AdminUser::isCurrentUserRootAdmin()) {
+        if (!$this->isAdminRequest()) {
+            return $next($request);
+        }
+
+        if(!AdminUser::isCurrentUserRootAdmin()) {
+            throw new ForbiddenException('Only root admin can manage admins.');
+        }
+        
+        if ($this->isRestrictedAdmin() && in_array($this->method, self::RESTRICTED_ADMIN_METHODS)) {
             if (!LicenseCheck::isGoldLicense()) {
                 throw new ForbiddenException('Restricted admins are not available for your license. Please upgrade to Gold.');
             };
@@ -50,12 +58,10 @@ class HandleRestrictedAdmin
      *
      * @return bool
      */
-    private function isRestrictedAdminRequest()
+    private function isAdminRequest()
     {
-        return in_array($this->method, self::RESTRICTED_ADMIN_METHODS) &&
-            MiddlewareHelper::requestUrlContains($this->request, 'system/admin') &&
-            !MiddlewareHelper::requestUrlContains($this->request, 'session') &&
-            $this->isRestrictedAdmin();
+        return MiddlewareHelper::requestUrlContains($this->request, 'system/admin') &&
+            !MiddlewareHelper::requestUrlContains($this->request, 'session');
     }
 
     /**

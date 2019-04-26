@@ -66,6 +66,16 @@ class AdminUser extends CoreAdminUser
     }
 
     /**
+     * Does root admin exist.
+     *
+     * @return bool
+     */
+    public static function doesRootAdminExist()
+    {
+        return AdminUser::whereIsRootAdmin(true)->exists();
+    }
+
+    /**
      * Get is_root_admin of the admin with given id
      *
      * @param $id

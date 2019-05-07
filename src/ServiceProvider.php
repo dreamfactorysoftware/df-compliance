@@ -10,6 +10,7 @@ use DreamFactory\Core\Enums\LicenseLevel;
 use DreamFactory\Core\System\Components\SystemResourceType;
 use DreamFactory\Core\Compliance\Http\Middleware\AccessibleTabs;
 use DreamFactory\Core\Compliance\Http\Middleware\HandleRestrictedAdmin;
+use DreamFactory\Core\Compliance\Http\Middleware\DoesRootAdminExist;
 use DreamFactory\Core\Compliance\Http\Middleware\HandleRestrictedAdminRole;
 use DreamFactory\Core\Compliance\Http\Middleware\MarkAsRootAdmin;
 use DreamFactory\Core\Compliance\Http\Middleware\ServiceLevelAudit;
@@ -60,6 +61,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
         // the method name was changed in Laravel 5.4
         if (method_exists(Router::class, 'aliasMiddleware')) {
             Route::aliasMiddleware('df.mark_root_admin', MarkAsRootAdmin::class);
+            Route::aliasMiddleware('df.does_root_admin_exist', DoesRootAdminExist::class);
             Route::aliasMiddleware('df.handle_restricted_admin', HandleRestrictedAdmin::class);
             Route::aliasMiddleware('df.service_level_audit', ServiceLevelAudit::class);
             Route::aliasMiddleware('df.accessible_tabs', AccessibleTabs::class);
@@ -67,6 +69,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
         } else {
             /** @noinspection PhpUndefinedMethodInspection */
             Route::middleware('df.mark_root_admin', MarkAsRootAdmin::class);
+            Route::middleware('df.does_root_admin_exist', DoesRootAdminExist::class);
             Route::middleware('df.handle_restricted_admin', HandleRestrictedAdmin::class);
             Route::middleware('df.service_level_audit', ServiceLevelAudit::class);
             Route::middleware('df.accessible_tabs', AccessibleTabs::class);
@@ -74,6 +77,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
         }
 
         Route::pushMiddlewareToGroup('df.api', 'df.mark_root_admin');
+        Route::pushMiddlewareToGroup('df.api', 'df.does_root_admin_exist');
         Route::pushMiddlewareToGroup('df.api', 'df.handle_restricted_admin');
         Route::pushMiddlewareToGroup('df.api', 'df.accessible_tabs');
         Route::pushMiddlewareToGroup('df.api', 'df.handle_restricted_admin_role');

@@ -14,6 +14,7 @@ class HandleRestrictedAdminRole
 {
 
     protected $request;
+    protected $method;
     protected $route;
 
     /**
@@ -26,6 +27,7 @@ class HandleRestrictedAdminRole
     function handle($request, Closure $next)
     {
         $this->request = $request;
+        $this->method = $request->getMethod();
         $this->route = $request->route();
 
         if ($this->isDeleteRestrictedAdminRoleRequest() && !AdminUser::isCurrentUserRootAdmin()) {
@@ -48,7 +50,8 @@ class HandleRestrictedAdminRole
             $roleIds = $this->getIdsParameter();
         }
 
-        return MiddlewareHelper::requestUrlContains($this->request, 'system/role') &&
+        return $this->method !== Verbs::GET &&
+            MiddlewareHelper::requestUrlContains($this->request, 'system/role') &&
             $this->isRestrictedAdminRolesByIds($roleIds);
     }
 

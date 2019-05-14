@@ -66,7 +66,6 @@ class RestrictedAdmin
      */
     public function createRestrictedAdminRole()
     {
-
         $role = Role::create(["name" => $this->email . "'s role", "description" => $this->email . "'s admin role", "is_active" => 1,
             "role_service_access_by_role_id" => $this->getRoleServiceAccess($this->tabs)]);
         $this->roleId = $role["id"];
@@ -111,25 +110,19 @@ class RestrictedAdmin
     /**
      * Returns user_to_app_to_role_by_user_id array to links Admin with new role.
      *
-     * @param int $userId
      * @param $isRestrictedAdmin
-     * @return array
+     * @param int $userId
+     * @return void
      */
-    public function getUserAppRoleByUserId($isRestrictedAdmin, $userId = 0)
+    public function handleUserAppRole($isRestrictedAdmin, $userId = 0)
     {
-        $userToAppToRoleByUserId = [];
-
         // Links role to api docs and file manager apps if the tabs are specified
         $isApiDocsTabSpecified = isset($this->tabs) && in_array("apidocs", $this->tabs);
         $isFilesTabSpecified = isset($this->tabs) && in_array("files", $this->tabs);
 
-        $userToAppToRoleByUserId[] = $this->handleUserAppRoleRelation($isRestrictedAdmin, $userId, "admin");
-        $userToAppToRoleByUserId[] = $this->handleUserAppRoleRelation($isApiDocsTabSpecified, $userId, "api_docs");
-        $userToAppToRoleByUserId[] = $this->handleUserAppRoleRelation($isFilesTabSpecified, $userId, "file_manager");
-        $userToAppToRoleByUserId = array_filter($userToAppToRoleByUserId, function ($userAppRole) {
-            return $userAppRole !== null;
-        });
-        return $userToAppToRoleByUserId;
+        $this->handleUserAppRoleRelation($isRestrictedAdmin, $userId, "admin");
+        $this->handleUserAppRoleRelation($isApiDocsTabSpecified, $userId, "api_docs");
+        $this->handleUserAppRoleRelation($isFilesTabSpecified, $userId, "file_manager");
     }
 
     /**
@@ -582,44 +575,34 @@ class RestrictedAdmin
      * Get userAppRole array to be added to the request for this relation to be created.
      *
      * @param string $appName
+     * @param $userId
      * @return mixed
      */
-    private function getUserAppRoleLink(string $appName)
+    private function getUserAppRoleLink(string $appName, $userId)
     {
-        return ["app_id" => $this->getAppIdByName($appName), "role_id" => $this->roleId];
+        return ["app_id" => $this->getAppIdByName($appName), "role_id" => $this->roleId, "user_id" => $userId];
     }
 
     /**
      * Check User App Role records existence .
      *
-     * @param $userId
      * @param array $userAppRoleData
      * @return mixed
      */
-    private function doUserAppRoleExist($userId, array $userAppRoleData)
+    private function doesUserAppRoleExist(array $userAppRoleData)
     {
-        if ($userAppRoleData["role_id"] === 0) return UserAppRole::whereUserId($userId)->whereAppId($userAppRoleData["app_id"])->exists();
-        if ($userId !== 0) return UserAppRole::whereUserId($userId)->whereAppId($userAppRoleData["app_id"])->whereRoleId($userAppRoleData["role_id"])->exists();
-        return UserAppRole::whereAppId($userAppRoleData["app_id"])->whereRoleId($userAppRoleData["role_id"])->exists();
+        return UserAppRole::whereUserId($userAppRoleData["user_id"])->whereAppId($userAppRoleData["app_id"])->whereRoleId($userAppRoleData["role_id"])->exists();
     }
 
     /**
      * Set user_id to null so it will be deleted.
      *
-     * @param $userId
      * @param array $userAppRoleData
-     * @return mixed
      */
-    private function deleteUserAppRoleLink($userId, array $userAppRoleData)
+    private function deleteUserAppRoleLink(array $userAppRoleData)
     {
-        $userAppRole = UserAppRole::whereUserId($userId)->whereAppId($userAppRoleData["app_id"])->whereRoleId($userAppRoleData["role_id"])->get()->toArray();
-        if ($userAppRoleData["role_id"] === 0)
-            $userAppRole = UserAppRole::whereUserId($userId)->whereAppId($userAppRoleData["app_id"])->get()->toArray();
-        if (count($userAppRole) > 0) {
-            $userAppRole = $userAppRole[0];
-            $userAppRole["user_id"] = null;
-        }
-        return $userAppRole;
+        $userAppRole = UserAppRole::whereUserId($userAppRoleData["user_id"])->whereAppId($userAppRoleData["app_id"])->whereRoleId($userAppRoleData["role_id"])->first()->toArray();
+        UserAppRole::deleteById($userAppRole['id']);
     }
 
     /**
@@ -630,10 +613,6 @@ class RestrictedAdmin
     private function validateCurrentUser()
     {
         $currentUserId = Session::getCurrentUserId();
-        $isCurrentUser = isset(AdminUser::getAdminByEmail($this->email)["id"]) ? AdminUser::getAdminByEmail($this->email)["id"] === $currentUserId : false;
-        if ($isCurrentUser) {
-            throw new ForbiddenException('Cannot edit your own Role.');
-        };
         $isRestrictedAdmin = UserAppRole::whereUserId($currentUserId)->exists();
         if ($isRestrictedAdmin) {
             throw new ForbiddenException('RestrictedAdmins are not allowed to edit access by tabs.');
@@ -646,14 +625,16 @@ class RestrictedAdmin
      * @param $isSpecified
      * @param $userId
      * @param $appName
-     * @return mixed
      */
     private function handleUserAppRoleRelation($isSpecified, $userId, $appName)
     {
-        if ($isSpecified && !$this->doUserAppRoleExist($userId, $this->getUserAppRoleLink($appName))) {
-            return $this->getUserAppRoleLink($appName);
-        } elseif (!$isSpecified && $this->doUserAppRoleExist($userId, $this->getUserAppRoleLink($appName))) {
-            return $this->deleteUserAppRoleLink($userId, $this->getUserAppRoleLink($appName));
+        $userAppRoleLink = $this->getUserAppRoleLink($appName, $userId);
+        $doesLinkExist = $this->doesUserAppRoleExist($userAppRoleLink);
+
+        if ($isSpecified && !$doesLinkExist) {
+            UserAppRole::createInternal($userAppRoleLink);
+        } elseif (!$isSpecified && $doesLinkExist) {
+            $this->deleteUserAppRoleLink($userAppRoleLink);
         }
     }
 }

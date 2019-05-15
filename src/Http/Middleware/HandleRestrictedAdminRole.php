@@ -31,7 +31,7 @@ class HandleRestrictedAdminRole
         $this->route = $request->route();
 
         if ($this->isDeleteRestrictedAdminRoleRequest() && !AdminUser::isCurrentUserRootAdmin()) {
-            throw new ForbiddenException('You do not have permission to restricted admin roles. Please contact your root administrator.');
+            throw new ForbiddenException('You do not have permission to modify restricted admin roles. Please contact your root administrator.');
         }
 
         // clear cache so the app don't try to find role id for the admin

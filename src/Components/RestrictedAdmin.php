@@ -243,6 +243,7 @@ class RestrictedAdmin
             ),
             "default" => array(
                 array("component" => "role/*", "verbMask" => VerbsMask::GET_MASK),
+                array("component" => "", "verbMask" => VerbsMask::GET_MASK),
                 array("component" => "admin/*", "verbMask" => VerbsMask::GET_MASK),
                 array("component" => "admin/profile", "verbMask" => VerbsMask::getFullAccessMask()),
                 array("component" => "admin/password", "verbMask" => VerbsMask::getFullAccessMask())

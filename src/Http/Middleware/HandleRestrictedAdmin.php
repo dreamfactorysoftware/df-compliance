@@ -152,11 +152,11 @@ class HandleRestrictedAdmin
         if ($isResourceWrapped) {
             foreach ($this->resContent['resource'] as $key => $adminData) {
                 $adminId = $adminData['id'];
-                $adminsData[] = $this->addRAParameters(AdminUser::whereId($adminId)->first()->toArray());
+                $adminsData[] = $this->addRestrictedAdminParameters(AdminUser::whereId($adminId)->first()->toArray());
             }
         } else {
             $adminId = $this->resContent['id'];
-            $adminsData[] = $this->addRAParameters(AdminUser::whereId($adminId)->first()->toArray());
+            $adminsData[] = $this->addRestrictedAdminParameters(AdminUser::whereId($adminId)->first()->toArray());
         }
 
         return $adminsData;
@@ -168,7 +168,7 @@ class HandleRestrictedAdmin
      * @param $adminData
      * @return array
      */
-    private function addRAParameters($adminData)
+    private function addRestrictedAdminParameters($adminData)
     {
         $adminEmail = isset($adminData['email']) ? $adminData['email'] : '';
 

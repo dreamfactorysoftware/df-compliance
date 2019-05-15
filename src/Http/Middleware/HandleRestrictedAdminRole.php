@@ -34,7 +34,11 @@ class HandleRestrictedAdminRole
             throw new ForbiddenException('You do not have permission to restricted admin roles. Please contact your root administrator.');
         }
 
-        return $next($this->request);
+        // clear cache so the app don't try to find role id for the admin
+        $response = $next($request);
+        \Cache::flush();
+
+        return $response;
     }
 
     /**

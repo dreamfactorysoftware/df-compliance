@@ -1,4 +1,5 @@
 <?php
+
 namespace DreamFactory\Core\Testing;
 
 use DreamFactory\Core\Compliance\Http\Middleware\ServiceLevelAudit;
@@ -13,6 +14,17 @@ use \Mockery as Mockery;
 
 class ServiceLevelAuditingTest extends TestCase
 {
+    private $adminData = [
+        'name' => 'John Doe',
+        'first_name' => 'John',
+        'last_name' => 'Doe',
+        'email' => 'jdoe@dreamfactory.com',
+        'password' => 'test1234',
+        'security_question' => 'Make of your first car?',
+        'security_answer' => 'mazda',
+        'is_active' => true
+    ];
+
     public function tearDown()
     {
         AdminUser::whereEmail('jdoe@dreamfactory.com')->delete();
@@ -22,17 +34,6 @@ class ServiceLevelAuditingTest extends TestCase
 
     public function testServiceReportCreation()
     {
-        $user = [
-            'name' => 'John Doe',
-            'first_name' => 'John',
-            'last_name' => 'Doe',
-            'email' => 'jdoe@dreamfactory.com',
-            'password' => 'test1234',
-            'security_question' => 'Make of your first car?',
-            'security_answer' => 'mazda',
-            'is_active' => true
-        ];
-
         $service = ["resource" => [
             [
                 "name" => "Node-test",
@@ -50,7 +51,7 @@ class ServiceLevelAuditingTest extends TestCase
                     "service_doc_by_service_id" => null
                 ]
             ]]];
-        $nonAdminUser = AdminUser::create($user);
+        $nonAdminUser = AdminUser::create($this->adminData);
         Session::setUserInfoWithJWT($nonAdminUser);
         $token = JWTUtilities::makeJWTByUser($nonAdminUser->id, $nonAdminUser->email);
         $app = App::find(1);
@@ -68,5 +69,18 @@ class ServiceLevelAuditingTest extends TestCase
             return $response;
         });
         $this->assertTrue(1 === ServiceReport::whereServiceName('Node-test')->count());
+    }
+
+    public function testNonRootAdminCannotGetServiceReports()
+    {
+        AdminUser::create($this->adminData);
+        $nonRootAdminUser = AdminUser::whereEmail($this->adminData['email'])->first();
+        $nonRootAdminUser->is_sys_admin = true;
+        $nonRootAdminUser->save();
+        Session::setUserInfoWithJWT($nonRootAdminUser);
+        $response = $this->get('/api/v2/system/service_reports');
+        $response->assertStatus(500);
+        $this->assertEquals(403, $response->exception->getStatusCode());
+        $this->assertEquals('Service Reports only available for root admin.', $response->exception->getMessage());
     }
 }

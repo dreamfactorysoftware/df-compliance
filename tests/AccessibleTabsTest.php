@@ -13,6 +13,22 @@ use \Mockery as m;
 
 class AccessibleTabsTest extends TestCase
 {
+    private $adminData = [
+        'name' => 'John Doe',
+        'first_name' => 'John',
+        'last_name' => 'Doe',
+        'email' => 'jdoe@dreamfactory.com',
+        'password' => 'test1234',
+        'security_question' => 'Make of your first car?',
+        'security_answer' => 'mazda',
+        'is_active' => true,
+        'is_root_admin' => true
+    ];
+
+    private $role = [
+        'id' => 0
+    ];
+
     public function tearDown()
     {
         AdminUser::whereEmail('jdoe@dreamfactory.com')->delete();
@@ -21,22 +37,7 @@ class AccessibleTabsTest extends TestCase
 
     public function testAccessibleTabs()
     {
-        $adminData = [
-            'name' => 'John Doe',
-            'first_name' => 'John',
-            'last_name' => 'Doe',
-            'email' => 'jdoe@dreamfactory.com',
-            'password' => 'test1234',
-            'security_question' => 'Make of your first car?',
-            'security_answer' => 'mazda',
-            'is_active' => true,
-            'is_root_admin' => true
-        ];
-        $role = [
-            'id' => 0
-        ];
-
-        $rootAdminUser = AdminUser::create($adminData);
+        $rootAdminUser = AdminUser::create($this->adminData);
         Session::setUserInfoWithJWT($rootAdminUser);
         $token = JWTUtilities::makeJWTByUser($rootAdminUser->id, $rootAdminUser->email);
         $apiKey = App::find(1)->api_key;
@@ -47,7 +48,7 @@ class AccessibleTabsTest extends TestCase
         $rq->setRouteResolver(function () use ($rq) {
             return (new Route('GET', 'api/{version}/{service}/{resource?}', []))->bind($rq);
         });
-        $response = m::mock('Illuminate\Http\Response')->shouldReceive('getOriginalContent')->once()->andReturn(['id' => $role['id']])->getMock();
+        $response = m::mock('Illuminate\Http\Response')->shouldReceive('getOriginalContent')->once()->andReturn(['id' => $this->role['id']])->getMock();
         $response->shouldReceive('setContent')->with(['id' => 0, 'accessible_tabs' => [
             0 => "apps",
             1 => "users",

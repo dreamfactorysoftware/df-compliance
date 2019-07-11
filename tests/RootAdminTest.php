@@ -14,6 +14,18 @@ use \Mockery as m;
 
 class RootAdminTest extends TestCase
 {
+    private $adminData = [
+        'name' => 'John Doe',
+        'first_name' => 'John',
+        'last_name' => 'Doe',
+        'email' => 'jdoe@dreamfactory.com',
+        'password' => 'test1234',
+        'security_question' => 'Make of your first car?',
+        'security_answer' => 'mazda',
+        'is_active' => true,
+        'is_root_admin' => true
+    ];
+
     public function tearDown()
     {
         AdminUser::whereEmail('jdoe@dreamfactory.com')->delete();
@@ -22,21 +34,9 @@ class RootAdminTest extends TestCase
 
     public function testMarkAsRootAdminMiddleware()
     {
-        $adminData = [
-            'name' => 'John Doe',
-            'first_name' => 'John',
-            'last_name' => 'Doe',
-            'email' => 'jdoe@dreamfactory.com',
-            'password' => 'test1234',
-            'security_question' => 'Make of your first car?',
-            'security_answer' => 'mazda',
-            'is_active' => true,
-            'is_root_admin' => true
-        ];
+        $loginData = ['email' => $this->adminData['email'], 'password' => $this->adminData['password'], 'remember_me' => false];
 
-        $loginData = ['email' => $adminData['email'], 'password' => $adminData['password'], 'remember_me' => false];
-
-        $rootAdminUser = AdminUser::create($adminData);
+        $rootAdminUser = AdminUser::create($this->adminData);
         Session::setUserInfoWithJWT($rootAdminUser);
         $token = JWTUtilities::makeJWTByUser($rootAdminUser->id, $rootAdminUser->email);
         $apiKey = App::find(1)->api_key;
@@ -46,8 +46,8 @@ class RootAdminTest extends TestCase
         $rq->setRouteResolver(function () use ($rq) {
             return (new Route('POST', 'api/{version}/{service}/{resource?}', []))->bind($rq);
         });
-        $response = m::mock('Illuminate\Http\Response')->shouldReceive('getOriginalContent')->once()->andReturn(['id' => AdminUser::whereEmail($adminData['email'])->first()->id])->getMock();
-        $response->shouldReceive('setContent')->with(['id' => AdminUser::whereEmail($adminData['email'])->first()->id, 'is_root_admin' => true]);
+        $response = m::mock('Illuminate\Http\Response')->shouldReceive('getOriginalContent')->once()->andReturn(['id' => AdminUser::whereEmail($this->adminData['email'])->first()->id])->getMock();
+        $response->shouldReceive('setContent')->with(['id' => AdminUser::whereEmail($this->adminData['email'])->first()->id, 'is_root_admin' => true]);
         $middleware = new MarkAsRootAdmin();
         $middleware->handle($rq, function () use ($response) {
             return $response;
@@ -56,19 +56,7 @@ class RootAdminTest extends TestCase
 
     public function testDoesRootAdminExist()
     {
-        $adminData = [
-            'name' => 'John Doe',
-            'first_name' => 'John',
-            'last_name' => 'Doe',
-            'email' => 'jdoe@dreamfactory.com',
-            'password' => 'test1234',
-            'security_question' => 'Make of your first car?',
-            'security_answer' => 'mazda',
-            'is_active' => true,
-            'is_root_admin' => true
-        ];
-
-        $rootAdminUser = AdminUser::create($adminData);
+        $rootAdminUser = AdminUser::create($this->adminData);
         Session::setUserInfoWithJWT($rootAdminUser);
         $token = JWTUtilities::makeJWTByUser($rootAdminUser->id, $rootAdminUser->email);
         $apiKey = App::find(1)->api_key;

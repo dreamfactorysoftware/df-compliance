@@ -10,6 +10,6 @@ update_configs:
       - "dependabot"
     allowed_updates:
       - match:
-          dependency_name: "df*"
+          dependency_name: "dreamfactory/df*"
     version_requirement_updates:
       "increase_versions"

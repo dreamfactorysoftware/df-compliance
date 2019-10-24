@@ -29,14 +29,17 @@ class HandleRestrictedAdminRole
         $this->request = $request;
         $this->method = $request->getMethod();
         $this->route = $request->route();
+        $roleIds = $this->getResourceId();
 
         if ($this->isDeleteRestrictedAdminRoleRequest() && !AdminUser::isCurrentUserRootAdmin()) {
             throw new ForbiddenException('You do not have permission to modify restricted admin roles. Please contact your root administrator.');
+        } elseif ($this->isDeleteRestrictedAdminRoleRequest()) {
+            foreach ($roleIds as $roleId) {
+                \Cache::forget('role:' . $roleId);
+            }
         }
 
-        // clear cache so the app don't try to find role id for the admin
         $response = $next($request);
-        \Cache::flush();
 
         return $response;
     }

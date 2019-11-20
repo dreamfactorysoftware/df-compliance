@@ -59,7 +59,8 @@ class AccessibleTabsTest extends TestCase
             6 => "scripts",
             7 => "config",
             8 => "packages",
-            9 => "limits"
+            9 => "limits",
+            10 => "scheduler"
         ]]);
         $middleware = new AccessibleTabs();
         $middleware->handle($rq, function () use ($response) {

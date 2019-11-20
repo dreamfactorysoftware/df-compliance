@@ -4,7 +4,6 @@ namespace DreamFactory\Core\Compliance\Components;
 
 use DreamFactory\Core\Compliance\Enums\ServiceRequestorTypes;
 use DreamFactory\Core\Compliance\Enums\VerbsMask;
-use DreamFactory\Core\Compliance\Models\AdminUser;
 use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Models\App;
 use DreamFactory\Core\Models\Role;
@@ -240,6 +239,10 @@ class RestrictedAdmin
                 array("component" => "role/", "verbMask" => VerbsMask::GET_MASK),
                 array("component" => "", "verbMask" => VerbsMask::GET_MASK),
                 array("component" => "service/", "verbMask" => VerbsMask::GET_MASK)
+            ),
+            "scheduler" => array(
+                array("component" => "scheduler/*", "verbMask" => VerbsMask::getFullAccessMask()),
+                array("component" => "", "verbMask" => VerbsMask::GET_MASK)
             ),
             "default" => array(
                 array("component" => "role/*", "verbMask" => VerbsMask::GET_MASK),

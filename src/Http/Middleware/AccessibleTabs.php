@@ -82,7 +82,10 @@ class AccessibleTabs
      */
     private static function addAccessibleTabs($roleInfo)
     {
-        $roleInfo['accessible_tabs'] = RestrictedAdmin::getAccessibleTabsByRoleId($roleInfo["id"]);
+        if(!isset($roleInfo['error'])) {
+            $roleInfo['accessible_tabs'] = RestrictedAdmin::getAccessibleTabsByRoleId($roleInfo["id"]);
+        }
+
         return $roleInfo;
     }
 }

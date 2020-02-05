@@ -36,6 +36,6 @@ class CreateServiceReportTable extends Migration
     public function down()
     {
         // service-reports
-        Schema::dropIfExists('service_reports');
+        Schema::dropIfExists('service_report');
     }
 }

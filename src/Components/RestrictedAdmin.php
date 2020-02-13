@@ -231,6 +231,7 @@ class RestrictedAdmin
                 array("component" => "app/*", "verbMask" => VerbsMask::GET_MASK),
                 array("component" => "*", "verbMask" => VerbsMask::GET_MASK | VerbsMask::POST_MASK, "serviceName" => "logs"),
                 array("component" => "*", "verbMask" => VerbsMask::GET_MASK | VerbsMask::POST_MASK, "serviceName" => "files"),
+                array("component" => "*", "verbMask" => VerbsMask::GET_MASK, "serviceName" => "system"),
             ),
             "limits" => array(
                 array("component" => "limit/*", "verbMask" => VerbsMask::getFullAccessMask()),

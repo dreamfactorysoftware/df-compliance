@@ -617,9 +617,7 @@ class RestrictedAdmin
      */
     private function validateCurrentUser()
     {
-        $currentUserId = Session::getCurrentUserId();
-        $isRestrictedAdmin = UserAppRole::whereUserId($currentUserId)->exists();
-        if ($isRestrictedAdmin) {
+        if (Session::hasRole()) {
             throw new ForbiddenException('RestrictedAdmins are not allowed to edit access by tabs.');
         };
     }

@@ -69,7 +69,8 @@ class HandleRestrictedAdmin
     private function isAdminRequest()
     {
         return MiddlewareHelper::requestUrlContains($this->request, 'system/admin') &&
-            !MiddlewareHelper::requestUrlContains($this->request, 'session');
+            !MiddlewareHelper::requestUrlContains($this->request, 'session') &&
+            !MiddlewareHelper::requestUrlContains($this->request, 'password');
     }
 
     /**

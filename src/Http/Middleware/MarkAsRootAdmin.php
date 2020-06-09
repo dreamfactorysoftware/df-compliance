@@ -29,8 +29,7 @@ class MarkAsRootAdmin
             return $response;
         }
 
-        if(method_exists($response,'getOriginalContent')) {
-            $content = $response->getOriginalContent();
+        if(is_array($content = $response->getOriginalContent()) && method_exists($response,'getOriginalContent')) {
             $content['is_root_admin'] = isset($content['id']) && AdminUser::isRootById($content['id']);
             $response->setContent($content);
         }

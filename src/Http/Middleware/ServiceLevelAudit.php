@@ -87,6 +87,7 @@ class ServiceLevelAudit
     protected function getServiceName($service)
     {
         $serviceName = '';
+        \Log::warning("Service from getServiceName: ", [$service]);
         if (gettype($service) === "string") {
             $serviceName = $this->getServiceNameById($service);
         } elseif (isset($service['id'])) {
@@ -174,16 +175,20 @@ class ServiceLevelAudit
     {
         $reportsData = [];
         if ($this->getServiceIdFromResource()) {
+            \Log::warning("Service ID from Resource: ",[$this->getServiceIdFromResource()]);
             $reportsData[] = $this->getReportData($this->getServiceIdFromResource());
         } elseif ($this->hasIdsParameter()) {
             foreach ($this->getIdsFromPayload() as $serviceId) {
+                \Log::warning("Service ID from payload: ", [$serviceId]);
                 $reportsData[] = $this->getReportData($serviceId);
             }
         } elseif ($this->isResourceWrapped()) {
             foreach ($this->payload['resource'] as $serviceData) {
+                \Log::warning("Service ID from payload (array): ", [$serviceData]);
                 $reportsData[] = $this->getReportData($serviceData);
             };
         }
+        \Log::warning("Result reportsData: ", [$reportsData]);
         return $reportsData;
     }
 
@@ -195,11 +200,23 @@ class ServiceLevelAudit
      */
     protected function getReportData($serviceData)
     {
+        \Log::warning("ServiceData of getReportData method: ", [$serviceData]);
         return ['service_id' => $this->getServiceId($serviceData),
             'service_name' => $this->getServiceName($serviceData),
             'user_email' => $this->getUserEmail(),
             'action' => $this->getAction(),
             'request_verb' => $this->method];
+
+//        [2021-06-30T19:46:27.498396+00:00] local.ERROR: SQLSTATE[23000]:
+// Integrity constraint violation: 1048 Column 'service_name' cannot be null
+// (SQL: insert into `service_report` (`service_id`, `service_name`, `user_email`,
+// `action`, `request_verb`, `last_modified_date`, `created_date`) values (18, ?,
+// andrew.li@census.gov, Service modified, PUT, 2021-06-30 19:46:27, 2021-06-30 19:46:27))
+// {"exception":"[object] (Illuminate\\Database\\QueryException(code: 23000): SQLSTATE[23000]:
+// Integrity constraint violation: 1048 Column 'service_name' cannot be null (SQL: insert into
+// `service_report` (`service_id`, `service_name`, `user_email`, `action`, `request_verb`, `last_modified_date`,
+// `created_date`) values (18, ?, andrew.li@census.gov, Service modified, PUT, 2021-06-30
+// 19:46:27, 2021-06-30 19:46:27)) at /data/projects/dreamfactory/vendor/laravel/framework/src/Illuminate/Database/Connection.php:669)
     }
 
     /**

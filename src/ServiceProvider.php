@@ -58,23 +58,12 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
      */
     protected function addMiddleware()
     {
-        // the method name was changed in Laravel 5.4
-        if (method_exists(Router::class, 'aliasMiddleware')) {
-            Route::aliasMiddleware('df.mark_root_admin', MarkAsRootAdmin::class);
-            Route::aliasMiddleware('df.does_root_admin_exist', DoesRootAdminExist::class);
-            Route::aliasMiddleware('df.handle_restricted_admin', HandleRestrictedAdmin::class);
-            Route::aliasMiddleware('df.service_level_audit', ServiceLevelAudit::class);
-            Route::aliasMiddleware('df.accessible_tabs', AccessibleTabs::class);
-            Route::aliasMiddleware('df.handle_restricted_admin_role', HandleRestrictedAdminRole::class);
-        } else {
-            /** @noinspection PhpUndefinedMethodInspection */
-            Route::middleware('df.mark_root_admin', MarkAsRootAdmin::class);
-            Route::middleware('df.does_root_admin_exist', DoesRootAdminExist::class);
-            Route::middleware('df.handle_restricted_admin', HandleRestrictedAdmin::class);
-            Route::middleware('df.service_level_audit', ServiceLevelAudit::class);
-            Route::middleware('df.accessible_tabs', AccessibleTabs::class);
-            Route::middleware('df.handle_restricted_admin_role', HandleRestrictedAdminRole::class);
-        }
+        Route::aliasMiddleware('df.mark_root_admin', MarkAsRootAdmin::class);
+        Route::aliasMiddleware('df.does_root_admin_exist', DoesRootAdminExist::class);
+        Route::aliasMiddleware('df.handle_restricted_admin', HandleRestrictedAdmin::class);
+        Route::aliasMiddleware('df.service_level_audit', ServiceLevelAudit::class);
+        Route::aliasMiddleware('df.accessible_tabs', AccessibleTabs::class);
+        Route::aliasMiddleware('df.handle_restricted_admin_role', HandleRestrictedAdminRole::class);
 
         Route::pushMiddlewareToGroup('df.api', 'df.mark_root_admin');
         Route::pushMiddlewareToGroup('df.api', 'df.does_root_admin_exist');

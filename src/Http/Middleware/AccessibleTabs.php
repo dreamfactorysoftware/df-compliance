@@ -48,7 +48,7 @@ class AccessibleTabs
     {
         return $method === Verbs::GET &&
             MiddlewareHelper::requestUrlContains($this->request, 'system/role') &&
-            $this->isAccessibleTabsSpecified($this->request->only('accessible_tabs'));
+            self::isAccessibleTabsSpecified($this->request->only('accessible_tabs'));
     }
 
     /**
@@ -59,10 +59,10 @@ class AccessibleTabs
     {
         if (isset($rolesInfo['resource'])) {
             foreach ($rolesInfo['resource'] as $key => $item) {
-                $rolesInfo['resource'][$key] = $this->addAccessibleTabs($item);
+                $rolesInfo['resource'][$key] = self::addAccessibleTabs($item);
             }
         } else {
-            $rolesInfo = $this->addAccessibleTabs($rolesInfo);
+            $rolesInfo = self::addAccessibleTabs($rolesInfo);
         }
         return $rolesInfo;
     }

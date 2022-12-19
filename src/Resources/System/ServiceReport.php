@@ -3,7 +3,6 @@
 namespace DreamFactory\Core\Compliance\Resources\System;
 
 use DreamFactory\Core\Compliance\Models\ServiceReport as ServiceReportModel;
-use DreamFactory\Core\Exceptions\NotImplementedException;
 use DreamFactory\Core\System\Resources\ReadOnlySystemResource;
 
 class ServiceReport extends ReadOnlySystemResource

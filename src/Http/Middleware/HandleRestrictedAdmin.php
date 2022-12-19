@@ -8,7 +8,6 @@ use DreamFactory\Core\Compliance\Utility\LicenseCheck;
 use DreamFactory\Core\Compliance\Utility\MiddlewareHelper;
 use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Enums\Verbs;
-use Illuminate\Support\Str;
 
 use Closure;
 
@@ -98,7 +97,7 @@ class HandleRestrictedAdmin
     {
         $accessByTabs = $this->getAccessTabs($adminData);
         $restrictedAdminHelper = new RestrictedAdmin($adminData["email"], $accessByTabs);
-        $isRestrictedAdmin = isset($adminData['is_restricted_admin']) ? $adminData['is_restricted_admin'] : false;
+        $isRestrictedAdmin = $adminData['is_restricted_admin'] ?? false;
         $notAllTabsSelected = !RestrictedAdmin::isAllTabs($accessByTabs);
 
         switch ($this->method) {
@@ -182,7 +181,7 @@ class HandleRestrictedAdmin
      */
     private function addRestrictedAdminParameters($adminData)
     {
-        $adminEmail = isset($adminData['email']) ? $adminData['email'] : '';
+        $adminEmail = $adminData['email'] ?? '';
 
         $isResourceWrapped = isset($this->reqPayload['resource']);
         if ($isResourceWrapped) {
@@ -208,7 +207,7 @@ class HandleRestrictedAdmin
      */
     private function getAccessTabs($adminData)
     {
-        return isset($adminData['access_by_tabs']) ? $adminData['access_by_tabs'] : [];
+        return $adminData['access_by_tabs'] ?? [];
     }
 
     /**
@@ -219,6 +218,6 @@ class HandleRestrictedAdmin
      */
     private function getIsRestrictedAdmin($adminData)
     {
-        return isset($adminData['is_restricted_admin']) ? $adminData['is_restricted_admin'] : [];
+        return $adminData['is_restricted_admin'] ?? [];
     }
 }

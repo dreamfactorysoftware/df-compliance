@@ -10,6 +10,7 @@ use DreamFactory\Core\Models\Role;
 use DreamFactory\Core\Models\RoleServiceAccess;
 use DreamFactory\Core\Models\UserAppRole;
 use DreamFactory\Core\Utility\Session;
+use Illuminate\Support\Arr;
 use ServiceManager;
 
 /**
@@ -254,7 +255,7 @@ class RestrictedAdmin
             )
         );
         if ($withDefault == false) {
-            return array_except($map, ["default"]);
+            return Arr::except($map, ["default"]);
         }
         return $map;
     }
@@ -278,7 +279,7 @@ class RestrictedAdmin
      */
     private static function getServiceName(array $access)
     {
-        return isset($access["serviceName"]) ? $access["serviceName"] : self::SYSTEM_SERVICE_NAME;
+        return $access["serviceName"] ?? self::SYSTEM_SERVICE_NAME;
     }
 
     /**
@@ -309,7 +310,7 @@ class RestrictedAdmin
      */
     private static function hasAccessToServiceComponent(array $roleServiceAccesses, array $serviceComponentAccess)
     {
-        return boolval(array_first($roleServiceAccesses, function ($roleAccess) use ($serviceComponentAccess) {
+        return boolval(Arr::first($roleServiceAccesses, function ($roleAccess) use ($serviceComponentAccess) {
             return $roleAccess["component"] === $serviceComponentAccess["component"] &&
                 $roleAccess["verb_mask"] === $serviceComponentAccess["verbMask"] &&
                 $roleAccess["service_id"] === ServiceManager::getServiceIdByName(self::getServiceName($serviceComponentAccess));
@@ -326,7 +327,7 @@ class RestrictedAdmin
      */
     private static function removeTab(array $tabs, string $tabName)
     {
-        return array_except($tabs, $tabName);
+        return Arr::except($tabs, $tabName);
     }
 
     /**
@@ -367,7 +368,7 @@ class RestrictedAdmin
      */
     private function getTabServiceAccesses($roleServiceAccess, $tab, $withDefault, $withTabs, $unique)
     {
-        $map = $this->getTabsAccessesMap($withDefault);
+        $map = self::getTabsAccessesMap($withDefault);
 
         foreach ($this->getTabServicesAccess($map[$tab]) as $access) {
             if ($unique) {
@@ -555,7 +556,7 @@ class RestrictedAdmin
         $result = array();
         foreach ($params as $access) {
             array_push($result, [
-                "service_id" => self::getServiceIdByName($this->getServiceName($access)),
+                "service_id" => self::getServiceIdByName(self::getServiceName($access)),
                 "component" => $access["component"],
                 "verb_mask" => $access["verbMask"],
                 "requestor_mask" => ServiceRequestorTypes::getAllRequestorTypes(),

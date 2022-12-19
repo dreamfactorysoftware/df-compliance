@@ -8,7 +8,7 @@ use DreamFactory\Core\Enums\LicenseLevel;
 class LicenseCheck
 {
     /**
-     * Is licence is Gold
+     * Is license is Gold
      *
      * @return bool
      */

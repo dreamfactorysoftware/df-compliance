@@ -4,7 +4,6 @@ namespace DreamFactory\Core\Compliance\Models;
 
 use DreamFactory\Core\Utility\Session;
 use DreamFactory\Core\Models\AdminUser as CoreAdminUser;
-use DreamFactory\Core\Exceptions\ForbiddenException;
 
 class AdminUser extends CoreAdminUser
 {

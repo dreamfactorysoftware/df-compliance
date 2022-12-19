@@ -10,9 +10,10 @@ use DreamFactory\Core\Utility\Session;
 use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Enums\Verbs;
 
+use Illuminate\Support\Arr;
+use ServiceManager;
 use Closure;
 use Route;
-use ServiceManager;
 
 class ServiceLevelAudit
 {
@@ -121,7 +122,7 @@ class ServiceLevelAudit
      */
     protected function getServiceIdFromResource()
     {
-        return array_get((!empty($this->resource)) ? explode('/', $this->resource) : [], 1);
+        return Arr::get((!empty($this->resource)) ? explode('/', $this->resource) : [], 1);
     }
 
     /**
@@ -132,24 +133,12 @@ class ServiceLevelAudit
     protected function getAction()
     {
         $action = '';
-        switch ($this->method) {
-            case 'POST':
-                {
-                    $action = 'Service created';
-                    break;
-                }
-            case 'PUT':
-            case 'PATCH':
-                {
-                    $action = 'Service modified';
-                    break;
-                }
-            case 'DELETE':
-                {
-                    $action = 'Service deleted';
-                    break;
-                }
-        }
+        $action = match ($this->method) {
+            'POST' => 'Service created',
+            'PUT', 'PATCH' => 'Service modified',
+            'DELETE' => 'Service deleted',
+            default => $action,
+        };
         return $action;
     }
 
@@ -270,7 +259,7 @@ class ServiceLevelAudit
         if (gettype($serviceData) === "string") {
             return $serviceData;
         } else {
-            return isset($serviceData['id']) ? $serviceData['id'] : null;
+            return $serviceData['id'] ?? null;
         }
     }
 }

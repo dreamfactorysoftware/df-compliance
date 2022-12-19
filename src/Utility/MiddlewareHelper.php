@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 class MiddlewareHelper
 {
     /**
-     * Is licence is Gold
+     * Is request URL contains endpoint
      *
      * @param $request
      * @param $endpoint

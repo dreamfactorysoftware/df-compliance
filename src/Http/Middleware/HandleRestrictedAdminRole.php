@@ -8,7 +8,7 @@ use DreamFactory\Core\Compliance\Utility\MiddlewareHelper;
 use DreamFactory\Core\Models\UserAppRole;
 use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Enums\Verbs;
-use Illuminate\Support\Str;
+use Illuminate\Support\Arr;
 
 class HandleRestrictedAdminRole
 {
@@ -85,7 +85,7 @@ class HandleRestrictedAdminRole
      */
     private function getResourceId()
     {
-        $id = array_get((!empty($this->route->parameter('resource'))) ? explode('/', $this->route->parameter('resource')) : [], 1);
+        $id = Arr::get((!empty($this->route->parameter('resource'))) ? explode('/', $this->route->parameter('resource')) : [], 1);
         return $id ?
             [$id] :
             [];

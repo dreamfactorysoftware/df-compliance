@@ -198,6 +198,9 @@ class RestrictedAdmin
                 array("component" => "role/*", "verbMask" => VerbsMask::GET_MASK),
                 array("component" => "app/*", "verbMask" => VerbsMask::GET_MASK)
             ),
+            "roles" => array(
+                array("component" => "role/*", "verbMask" => VerbsMask::GET_MASK)
+            ),
             "services" => array(
                 array("component" => "service_type/", "verbMask" => VerbsMask::getFullAccessMask()),
                 array("component" => "service/*", "verbMask" => VerbsMask::getFullAccessMask())

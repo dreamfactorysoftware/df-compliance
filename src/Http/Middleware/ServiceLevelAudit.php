@@ -150,7 +150,7 @@ class ServiceLevelAudit
     protected function getUserEmail()
     {
         $user = Session::user();
-        $userEmail = $user->email;
+        $userEmail = $user ? $user->email : null;
         return $userEmail;
     }
 

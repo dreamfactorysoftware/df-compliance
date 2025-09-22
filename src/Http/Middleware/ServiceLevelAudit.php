@@ -150,8 +150,31 @@ class ServiceLevelAudit
     protected function getUserEmail()
     {
         $user = Session::user();
-        $userEmail = $user->email;
-        return $userEmail;
+        if ($user) {
+            return $user->email;
+        }
+        
+        // For API key authentication, return a meaningful identifier
+        $apiKey = Session::getApiKey();
+        if ($apiKey) {
+            // Try to get app name from the API key
+            try {
+                $appId = \DreamFactory\Core\Models\App::getAppIdByApiKey($apiKey);
+                if ($appId) {
+                    $app = \DreamFactory\Core\Models\App::find($appId);
+                    if ($app) {
+                        return 'api:' . $app->name;
+                    }
+                }
+            } catch (\Exception $e) {
+                // Fall back to using partial API key
+            }
+            // If we can't get app name, use first 8 chars of API key as identifier
+            return 'api:' . substr($apiKey, 0, 8) . '...';
+        }
+        
+        // Default fallback
+        return 'system';
     }
 
     /**

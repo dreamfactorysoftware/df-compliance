@@ -26,7 +26,7 @@ class RootAdminTest extends TestCase
         'is_root_admin' => true
     ];
 
-    public function tearDown()
+    public function tearDown(): void
     {
         AdminUser::whereEmail('jdoe@dreamfactory.com')->delete();
         parent::tearDown();

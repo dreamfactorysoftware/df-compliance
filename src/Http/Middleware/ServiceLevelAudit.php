@@ -110,6 +110,11 @@ class ServiceLevelAudit
         $serviceName = '';
         if (!is_null($serviceId) && ('' !== $serviceId)) {
             $serviceName = ServiceManager::getServiceNameById($serviceId);
+            if (empty($serviceName)) {
+                // The ServiceManager id->name map is cached forever and can go stale
+                // (e.g. service rows created outside a purge). Fall back to the DB.
+                $serviceName = \DreamFactory\Core\Models\Service::whereId($serviceId)->value('name') ?? '';
+            }
         }
 
         return $serviceName;
@@ -225,7 +230,12 @@ class ServiceLevelAudit
     {
         if (!$this->isFailure($response)) {
             foreach ($reportsData as $report) {
-                ServiceReport::create($report)->save();
+                try {
+                    ServiceReport::create($report);
+                } catch (\Throwable $e) {
+                    // Audit bookkeeping must never fail the request that already succeeded.
+                    \Log::warning('Service audit write failed: ' . $e->getMessage(), ['report' => $report]);
+                }
             }
         }
     }

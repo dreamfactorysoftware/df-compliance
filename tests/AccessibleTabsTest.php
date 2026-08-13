@@ -29,7 +29,7 @@ class AccessibleTabsTest extends TestCase
         'id' => 0
     ];
 
-    public function tearDown()
+    public function tearDown(): void
     {
         AdminUser::whereEmail('jdoe@dreamfactory.com')->delete();
         parent::tearDown();

@@ -63,7 +63,7 @@ class RestrictedAdminsTest extends TestCase
         'is_active' => true
     ];
 
-    public function tearDown()
+    public function tearDown(): void
     {
         AdminUser::whereEmail('jdoe@dreamfactory.com')->delete();
         AdminUser::whereEmail('jdoeRA@dreamfactory.com')->delete();

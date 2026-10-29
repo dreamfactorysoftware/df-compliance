@@ -536,6 +536,8 @@ class RestrictedAdmin
         $tabsToDelete = array_diff($accessibleTabs, $this->tabs);
         $roleServiceAccesses = $this->deleteRoleServiceAccesses($tabsToDelete, $roleServiceAccesses, $accessibleTabs);
         $roleServiceAccesses = $this->addServiceAccess($roleServiceAccesses, $this->getRoleServiceAccess($tabsToAdd, false));
+        // kept tabs too, so a plain re-save grants optional accesses (server_setting/*) to roles that predate them
+        $roleServiceAccesses = $this->addServiceAccess($roleServiceAccesses, $this->getRoleServiceAccess(array_intersect($this->tabs, $accessibleTabs), false));
         return $roleServiceAccesses;
     }
 

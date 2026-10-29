@@ -153,6 +153,19 @@ class RestrictedAdminsTest extends TestCase
         $this->assertContains('config', RestrictedAdmin::getAccessibleTabsByRoleId($role->id));
     }
 
+    public function testResaveGrantsServerSettingToExistingConfigAdmin()
+    {
+        $role = $this->createRARole(['config']);
+        RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->delete();
+
+        // root admin saves the admin again with the same tabs
+        $root = AdminUser::whereEmail($this->rootAdminData['email'])->first();
+        Session::setUserInfo(['id' => $root->id, 'email' => $root->email, 'is_sys_admin' => true]);
+        (new RestrictedAdmin($this->raAdminData['email'], ['config']))->updateRestrictedAdminRole();
+
+        $this->assertSame(1, RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->count());
+    }
+
     public function createRARole(array $tabs = ['users'])
     {
         // Create a RA role

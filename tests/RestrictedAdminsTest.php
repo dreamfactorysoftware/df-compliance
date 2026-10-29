@@ -4,6 +4,8 @@ namespace DreamFactory\Core\Testing;
 
 use DreamFactory\Core\Compliance\Http\Middleware\HandleRestrictedAdminRole;
 use DreamFactory\Core\Compliance\Http\Middleware\HandleRestrictedAdmin;
+use DreamFactory\Core\Compliance\Components\RestrictedAdmin;
+use DreamFactory\Core\Compliance\Enums\VerbsMask;
 use DreamFactory\Core\Compliance\Models\AdminUser;
 use DreamFactory\Core\Models\Role;
 use DreamFactory\Core\Models\RoleServiceAccess;
@@ -14,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use DreamFactory\Core\Exceptions\ForbiddenException;
 use \Mockery as m;
+use ServiceManager;
 
 class RestrictedAdminsTest extends TestCase
 {
@@ -131,7 +134,26 @@ class RestrictedAdminsTest extends TestCase
         $this->assertEquals('You do not have permission to modify restricted admin roles. Please contact your root administrator.', $response->exception->getMessage());
     }
 
-    public function createRARole()
+    public function testConfigTabGrantsServerSettingAccess()
+    {
+        $role = $this->createRARole(['config']);
+        $access = RoleServiceAccess::whereRoleId($role->id)
+            ->whereServiceId(ServiceManager::getServiceIdByName('system'))
+            ->whereComponent('server_setting/*')
+            ->first();
+        $this->assertNotNull($access);
+        $this->assertEquals(VerbsMask::getFullAccessMask(), $access->verb_mask);
+    }
+
+    public function testRoleWithoutServerSettingRowKeepsConfigTab()
+    {
+        // a restricted admin created before server_setting/* joined the Config tab
+        $role = $this->createRARole(['config']);
+        RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->delete();
+        $this->assertContains('config', RestrictedAdmin::getAccessibleTabsByRoleId($role->id));
+    }
+
+    public function createRARole(array $tabs = ['users'])
     {
         // Create a RA role
         $rootAdmin = AdminUser::create($this->rootAdminData);
@@ -144,7 +166,7 @@ class RestrictedAdminsTest extends TestCase
         Session::setUserInfoWithJWT($rootAdmin);
         $token = JWTUtilities::makeJWTByUser($rootAdmin->id, $rootAdmin->email);
         $apiKey = App::find(1)->api_key;
-        $rq = Request::create("http://localhost/api/v2/system/admin", "POST", $this->adminRequstData, [], [], [], []);
+        $rq = Request::create("http://localhost/api/v2/system/admin", "POST", ['access_by_tabs' => $tabs] + $this->adminRequstData, [], [], [], []);
         $rq->headers->set('HTTP_X_DREAMFACTORY_SESSION_TOKEN', $token);
         $rq->headers->set('X-Dreamfactory-API-Key', $apiKey);
         $rq->setRouteResolver(function () use ($rq) {

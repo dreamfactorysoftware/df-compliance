@@ -228,7 +228,8 @@ class RestrictedAdmin
                 array("component" => "lookup/*", "verbMask" => VerbsMask::getFullAccessMask()),
                 array("component" => "", "verbMask" => VerbsMask::GET_MASK),
                 array("component" => "*", "verbMask" => VerbsMask::getFullAccessMask(), "serviceName" => "logs"),
-                array("component" => "*", "verbMask" => VerbsMask::getFullAccessMask(), "serviceName" => "email")
+                array("component" => "*", "verbMask" => VerbsMask::getFullAccessMask(), "serviceName" => "email"),
+                array("component" => "server_setting/*", "verbMask" => VerbsMask::getFullAccessMask(), "optional" => true)
             ),
             "packages" => array(
                 array("component" => "package/*", "verbMask" => VerbsMask::getFullAccessMask()),
@@ -296,6 +297,12 @@ class RestrictedAdmin
     {
         $hasAccess = true;
         foreach ($tabAccess as $access) {
+            // ponytail: optional entries are granted on create/update but not needed to detect the tab, so
+            // restricted admins created before server_setting/* existed keep Config. Drop the flag once
+            // existing roles are backfilled.
+            if (!empty($access['optional'])) {
+                continue;
+            }
             if (!self::hasAccessToServiceComponent($roleServiceAccesses, $access)) {
                 $hasAccess = false;
             }
@@ -529,6 +536,8 @@ class RestrictedAdmin
         $tabsToDelete = array_diff($accessibleTabs, $this->tabs);
         $roleServiceAccesses = $this->deleteRoleServiceAccesses($tabsToDelete, $roleServiceAccesses, $accessibleTabs);
         $roleServiceAccesses = $this->addServiceAccess($roleServiceAccesses, $this->getRoleServiceAccess($tabsToAdd, false));
+        // kept tabs too, so a plain re-save grants optional accesses (server_setting/*) to roles that predate them
+        $roleServiceAccesses = $this->addServiceAccess($roleServiceAccesses, $this->getRoleServiceAccess(array_intersect($this->tabs, $accessibleTabs), false));
         return $roleServiceAccesses;
     }
 

@@ -297,7 +297,7 @@ class RestrictedAdmin
     {
         $hasAccess = true;
         foreach ($tabAccess as $access) {
-            // ponytail: optional entries are granted on create/update but not needed to detect the tab, so
+            // optional entries are granted on create/update but not needed to detect the tab, so
             // restricted admins created before server_setting/* existed keep Config. Drop the flag once
             // existing roles are backfilled.
             if (!empty($access['optional'])) {
@@ -536,8 +536,15 @@ class RestrictedAdmin
         $tabsToDelete = array_diff($accessibleTabs, $this->tabs);
         $roleServiceAccesses = $this->deleteRoleServiceAccesses($tabsToDelete, $roleServiceAccesses, $accessibleTabs);
         $roleServiceAccesses = $this->addServiceAccess($roleServiceAccesses, $this->getRoleServiceAccess($tabsToAdd, false));
-        // kept tabs too, so a plain re-save grants optional accesses (server_setting/*) to roles that predate them
-        $roleServiceAccesses = $this->addServiceAccess($roleServiceAccesses, $this->getRoleServiceAccess(array_intersect($this->tabs, $accessibleTabs), false));
+        // kept tabs: only the optional accesses (server_setting/*), so a re-save grants them to roles that
+        // predate them without re-adding rows a root admin narrowed
+        $optional = [];
+        foreach (array_intersect($this->tabs, $accessibleTabs) as $tab) {
+            foreach (self::getTabsAccessesMap(false)[$tab] ?? [] as $access) {
+                if (!empty($access['optional'])) $optional[] = $access;
+            }
+        }
+        $roleServiceAccesses = $this->addServiceAccess($roleServiceAccesses, $this->getTabServicesAccess($optional));
         return $roleServiceAccesses;
     }
 

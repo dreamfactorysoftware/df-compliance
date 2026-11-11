@@ -157,6 +157,8 @@ class RestrictedAdminsTest extends TestCase
     {
         $role = $this->createRARole(['config']);
         RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->delete();
+        // a root admin narrowed one row of the tab; a re-save must not add the wide one back
+        RoleServiceAccess::whereRoleId($role->id)->whereComponent('cors/*')->update(['requestor_mask' => 1]);
 
         // root admin saves the admin again with the same tabs
         $root = AdminUser::whereEmail($this->rootAdminData['email'])->first();
@@ -164,6 +166,7 @@ class RestrictedAdminsTest extends TestCase
         (new RestrictedAdmin($this->raAdminData['email'], ['config']))->updateRestrictedAdminRole();
 
         $this->assertSame(1, RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->count());
+        $this->assertSame(1, RoleServiceAccess::whereRoleId($role->id)->whereComponent('cors/*')->count());
     }
 
     public function testRemovingConfigTabRevokesServerSettingAccess()

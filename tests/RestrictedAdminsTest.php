@@ -169,6 +169,20 @@ class RestrictedAdminsTest extends TestCase
         $this->assertSame(1, RoleServiceAccess::whereRoleId($role->id)->whereComponent('cors/*')->count());
     }
 
+    public function testResaveKeepsNarrowedServerSettingRow()
+    {
+        $role = $this->createRARole(['config']);
+        RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->update(['verb_mask' => 1]);
+
+        $root = AdminUser::whereEmail($this->rootAdminData['email'])->first();
+        Session::setUserInfo(['id' => $root->id, 'email' => $root->email, 'is_sys_admin' => true]);
+        (new RestrictedAdmin($this->raAdminData['email'], ['config']))->updateRestrictedAdminRole();
+
+        $rows = RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->get();
+        $this->assertCount(1, $rows);
+        $this->assertSame(1, (int)$rows[0]->verb_mask);
+    }
+
     public function testRemovingConfigTabRevokesServerSettingAccess()
     {
         $role = $this->createRARole(['config', 'users']);

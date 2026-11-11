@@ -541,7 +541,9 @@ class RestrictedAdmin
         $optional = [];
         foreach (array_intersect($this->tabs, $accessibleTabs) as $tab) {
             foreach (self::getTabsAccessesMap(false)[$tab] ?? [] as $access) {
-                if (!empty($access['optional'])) $optional[] = $access;
+                $sid = self::getServiceIdByName(self::getServiceName($access));
+                $present = Arr::first($roleServiceAccesses, fn($r) => $r['component'] === $access['component'] && $r['service_id'] === $sid);
+                if (!empty($access['optional']) && !$present) $optional[] = $access;
             }
         }
         $roleServiceAccesses = $this->addServiceAccess($roleServiceAccesses, $this->getTabServicesAccess($optional));

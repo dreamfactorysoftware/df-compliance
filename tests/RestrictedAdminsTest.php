@@ -4,6 +4,8 @@ namespace DreamFactory\Core\Testing;
 
 use DreamFactory\Core\Compliance\Http\Middleware\HandleRestrictedAdminRole;
 use DreamFactory\Core\Compliance\Http\Middleware\HandleRestrictedAdmin;
+use DreamFactory\Core\Compliance\Components\RestrictedAdmin;
+use DreamFactory\Core\Compliance\Enums\VerbsMask;
 use DreamFactory\Core\Compliance\Models\AdminUser;
 use DreamFactory\Core\Models\Role;
 use DreamFactory\Core\Models\RoleServiceAccess;
@@ -14,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use DreamFactory\Core\Exceptions\ForbiddenException;
 use \Mockery as m;
+use ServiceManager;
 
 class RestrictedAdminsTest extends TestCase
 {
@@ -131,7 +134,78 @@ class RestrictedAdminsTest extends TestCase
         $this->assertEquals('You do not have permission to modify restricted admin roles. Please contact your root administrator.', $response->exception->getMessage());
     }
 
-    public function createRARole()
+    public function testConfigTabGrantsServerSettingAccess()
+    {
+        $role = $this->createRARole(['config']);
+        $access = RoleServiceAccess::whereRoleId($role->id)
+            ->whereServiceId(ServiceManager::getServiceIdByName('system'))
+            ->whereComponent('server_setting/*')
+            ->first();
+        $this->assertNotNull($access);
+        $this->assertEquals(VerbsMask::getFullAccessMask(), $access->verb_mask);
+    }
+
+    public function testRoleWithoutServerSettingRowKeepsConfigTab()
+    {
+        // a restricted admin created before server_setting/* joined the Config tab
+        $role = $this->createRARole(['config']);
+        RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->delete();
+        $this->assertContains('config', RestrictedAdmin::getAccessibleTabsByRoleId($role->id));
+    }
+
+    public function testResaveGrantsServerSettingToExistingConfigAdmin()
+    {
+        $role = $this->createRARole(['config']);
+        RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->delete();
+        // a root admin narrowed one row of the tab; a re-save must not add the wide one back
+        RoleServiceAccess::whereRoleId($role->id)->whereComponent('cors/*')->update(['requestor_mask' => 1]);
+
+        // root admin saves the admin again with the same tabs
+        $root = AdminUser::whereEmail($this->rootAdminData['email'])->first();
+        Session::setUserInfo(['id' => $root->id, 'email' => $root->email, 'is_sys_admin' => true]);
+        (new RestrictedAdmin($this->raAdminData['email'], ['config']))->updateRestrictedAdminRole();
+
+        $this->assertSame(1, RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->count());
+        $this->assertSame(1, RoleServiceAccess::whereRoleId($role->id)->whereComponent('cors/*')->count());
+    }
+
+    public function testResaveKeepsNarrowedServerSettingRow()
+    {
+        $role = $this->createRARole(['config']);
+        RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->update(['verb_mask' => 1]);
+
+        $root = AdminUser::whereEmail($this->rootAdminData['email'])->first();
+        Session::setUserInfo(['id' => $root->id, 'email' => $root->email, 'is_sys_admin' => true]);
+        (new RestrictedAdmin($this->raAdminData['email'], ['config']))->updateRestrictedAdminRole();
+
+        $rows = RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->get();
+        $this->assertCount(1, $rows);
+        $this->assertSame(1, (int)$rows[0]->verb_mask);
+    }
+
+    public function testRemovingConfigTabRevokesServerSettingAccess()
+    {
+        $role = $this->createRARole(['config', 'users']);
+        $this->assertSame(1, RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->count());
+
+        // root admin saves the admin again without the Config tab
+        $root = AdminUser::whereEmail($this->rootAdminData['email'])->first();
+        Session::setUserInfo(['id' => $root->id, 'email' => $root->email, 'is_sys_admin' => true]);
+        (new RestrictedAdmin($this->raAdminData['email'], ['users']))->updateRestrictedAdminRole();
+
+        $this->assertSame(0, RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->count());
+        $tabs = RestrictedAdmin::getAccessibleTabsByRoleId($role->id);
+        $this->assertNotContains('config', $tabs);
+        $this->assertContains('users', $tabs);
+    }
+
+    public function testTabsWithoutConfigNeverGrantServerSetting()
+    {
+        $role = $this->createRARole(['apps', 'users', 'services', 'scripts', 'limits', 'scheduler']);
+        $this->assertSame(0, RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->count());
+    }
+
+    public function createRARole(array $tabs = ['users'])
     {
         // Create a RA role
         $rootAdmin = AdminUser::create($this->rootAdminData);
@@ -144,7 +218,7 @@ class RestrictedAdminsTest extends TestCase
         Session::setUserInfoWithJWT($rootAdmin);
         $token = JWTUtilities::makeJWTByUser($rootAdmin->id, $rootAdmin->email);
         $apiKey = App::find(1)->api_key;
-        $rq = Request::create("http://localhost/api/v2/system/admin", "POST", $this->adminRequstData, [], [], [], []);
+        $rq = Request::create("http://localhost/api/v2/system/admin", "POST", ['access_by_tabs' => $tabs] + $this->adminRequstData, [], [], [], []);
         $rq->headers->set('HTTP_X_DREAMFACTORY_SESSION_TOKEN', $token);
         $rq->headers->set('X-Dreamfactory-API-Key', $apiKey);
         $rq->setRouteResolver(function () use ($rq) {

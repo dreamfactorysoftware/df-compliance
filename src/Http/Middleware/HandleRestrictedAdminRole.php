@@ -6,16 +6,16 @@ use Closure;
 use DreamFactory\Core\Compliance\Models\AdminUser;
 use DreamFactory\Core\Compliance\Utility\MiddlewareHelper;
 use DreamFactory\Core\Models\UserAppRole;
-use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Enums\Verbs;
-use Illuminate\Support\Arr;
+use DreamFactory\Core\System\Resources\Role as RoleResource;
 
 class HandleRestrictedAdminRole
 {
+    // Request methods that change roles
+    const MODIFY_METHODS = [Verbs::POST, Verbs::PUT, Verbs::PATCH, Verbs::DELETE];
 
     protected $request;
     protected $method;
-    protected $route;
 
     /**
      * @param         $request
@@ -28,97 +28,106 @@ class HandleRestrictedAdminRole
     {
         $this->request = $request;
         $this->method = $request->getMethod();
-        $this->route = $request->route();
-        $roleIds = $this->getResourceId();
 
-        if ($this->isDeleteRestrictedAdminRoleRequest() && !AdminUser::isCurrentUserRootAdmin()) {
-            throw new ForbiddenException('You do not have permission to modify restricted admin roles. Please contact your root administrator.');
-        } elseif ($this->isDeleteRestrictedAdminRoleRequest()) {
+        if (!in_array($this->method, self::MODIFY_METHODS) ||
+            !MiddlewareHelper::addresses($request, 'system', 'role')
+        ) {
+            return $next($request);
+        }
+
+        $roleIds = $this->getRestrictedAdminRoleIds();
+        if (!empty($roleIds)) {
+            if (!AdminUser::isCurrentUserRootAdmin()) {
+                return MiddlewareHelper::forbiddenResponse('You do not have permission to modify restricted admin roles. Please contact your root administrator.');
+            }
+
             foreach ($roleIds as $roleId) {
                 \Cache::forget('role:' . $roleId);
             }
         }
 
-        $response = $next($request);
-
-        return $response;
+        return $next($request);
     }
 
     /**
-     * Does request go to system/role/* endpoint
+     * Ids of the restricted admin roles the request changes
      *
-     * @return bool
+     * @return array
      */
-    private function isDeleteRestrictedAdminRoleRequest()
+    protected function getRestrictedAdminRoleIds()
     {
-        $roleIds = $this->getResourceId();
+        $roleIds = static::getRequestedRoleIds($this->request, MiddlewareHelper::getPayload($this->request));
+        $filter = $this->request->input('filter');
 
-        if (count($roleIds) === 0) {
-            $roleIds = $this->getIdsParameter();
+        if (!empty($filter)) {
+            $filterIds = MiddlewareHelper::getIdsFromFilter(RoleResource::class);
+            if (null === $filterIds) {
+                return $this->getAllRestrictedAdminRoleIds();
+            }
+            $roleIds = array_merge($roleIds, $filterIds);
+        } elseif (empty($roleIds) && $this->method === Verbs::DELETE &&
+            MiddlewareHelper::isTrue($this->request->input('force'))
+        ) {
+            // Deleting with force and nothing selected removes every role.
+            return $this->getAllRestrictedAdminRoleIds();
         }
 
-        return $this->method !== Verbs::GET &&
-            MiddlewareHelper::requestUrlContains($this->request, 'system/role') &&
-            $this->isRestrictedAdminRolesByIds($roleIds);
+        if (empty($roleIds)) {
+            return [];
+        }
+
+        return $this->restrictedAdminRoles()
+            ->whereIn('role_id', array_values(array_unique($roleIds)))
+            ->pluck('role_id')->unique()->values()->all();
     }
 
     /**
-     * Does any role belong to any RA
+     * Ids of all restricted admin roles
      *
-     * @param $roleIds
-     * @return boolean
+     * @return array
      */
-    protected function isRestrictedAdminRolesByIds($roleIds)
+    protected function getAllRestrictedAdminRoleIds()
     {
-        foreach ($roleIds as $roleId) {
-            if ($this->isRestrictedAdminRole($roleId)) {
-                return true;
+        return $this->restrictedAdminRoles()->pluck('role_id')->unique()->values()->all();
+    }
+
+    /**
+     * Ids of the roles a request names: in the URL, in the ids option and in
+     * the records of the request body. Ids selected by a filter are not included.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @param array                    $payload the request body
+     *
+     * @return string[]
+     */
+    public static function getRequestedRoleIds($request, array $payload)
+    {
+        $roleIds = [];
+
+        foreach (MiddlewareHelper::getRequestTargets($request) as $target) {
+            $id = $target['resource'][1] ?? null;
+            if (MiddlewareHelper::targetMatches($target, 'system', ['role']) && null !== $id && '' !== $id) {
+                $roleIds[] = $id;
             }
-        };
-        return false;
+        }
+
+        $roleIds = array_merge(
+            $roleIds,
+            MiddlewareHelper::getIdList($request->input('ids')),
+            MiddlewareHelper::getIdList($payload['ids'] ?? null),
+            MiddlewareHelper::getRecordIds($payload)
+        );
+
+        return array_values(array_unique(array_map('strval', $roleIds)));
     }
 
     /**
-     * Get resource Id
+     * Role assignments that belong to admins
      *
-     * @return array
+     * @return \Illuminate\Database\Eloquent\Builder
      */
-    private function getResourceId()
+    protected function restrictedAdminRoles()
     {
-        $id = Arr::get((!empty($this->route->parameter('resource'))) ? explode('/', $this->route->parameter('resource')) : [], 1);
-        return $id ?
-            [$id] :
-            [];
+        return UserAppRole::whereIn('user_id', AdminUser::where('is_sys_admin', true)->select('id'));
     }
-
-    /**
-     * @param $roleId
-     * @return mixed
-     */
-    protected function getUserIdFromUserAppRole($roleId)
-    {
-        return UserAppRole::whereRoleId($roleId)->get()->toArray()[0]['user_id'];
-    }
-
-    /**
-     * Does role with this id belong to a restricted admin
-     *
-     * @param $roleId
-     * @return bool
-     */
-    protected function isRestrictedAdminRole($roleId)
-    {
-        return UserAppRole::whereRoleId($roleId)->exists() && AdminUser::adminExistsById($this->getUserIdFromUserAppRole($roleId));
-    }
-
-    /**
-     * Get ?ids= parameter
-     *
-     * @return array
-     */
-    private function getIdsParameter()
-    {
-        return $this->request->input('ids') ? explode(',', $this->request->input('ids')) : [];
-    }
-
 }

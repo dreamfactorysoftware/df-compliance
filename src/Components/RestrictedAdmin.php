@@ -641,7 +641,7 @@ class RestrictedAdmin
     {
         if (Session::hasRole()) {
             throw new ForbiddenException('RestrictedAdmins are not allowed to edit access by tabs.');
-        };
+        }
     }
 
     /**

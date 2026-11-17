@@ -7,13 +7,11 @@ use DreamFactory\Core\Compliance\Models\ServiceReport;
 use DreamFactory\Core\Compliance\Utility\LicenseCheck;
 use DreamFactory\Core\Compliance\Utility\MiddlewareHelper;
 use DreamFactory\Core\Utility\Session;
-use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Enums\Verbs;
+use DreamFactory\Core\System\Resources\Service as ServiceResource;
 
-use Illuminate\Support\Arr;
 use ServiceManager;
 use Closure;
-use Route;
 
 class ServiceLevelAudit
 {
@@ -32,20 +30,26 @@ class ServiceLevelAudit
     public function handle($request, Closure $next)
     {
         $this->method = $request->getMethod();
-        $this->payload = $request->input();
         $this->request = $request;
 
-        $this->validateServiceReportRequest();
+        if ($refusal = $this->validateServiceReportRequest()) {
+            return $refusal;
+        }
 
-        if ($this->isServiceRequest()) {
-            $this->resource = $this->request->route()->parameter('resource');
-            $serviceReportsData = $this->getReportsData();
-            $response = $next($request);
-
-            $this->createServiceReports($response, $serviceReportsData);
-        } else {
+        if (!$this->isServiceRequest()) {
             return $next($request);
         }
+
+        try {
+            $this->payload = MiddlewareHelper::getPayload($request);
+            $this->resource = $this->getServiceResourceSegments();
+            $serviceReportsData = $this->getReportsData();
+        } catch (\Throwable $e) {
+            return MiddlewareHelper::errorResponse($e);
+        }
+
+        $response = $next($request);
+        $this->createServiceReports($response, $serviceReportsData);
 
         return $response;
     }
@@ -53,30 +57,44 @@ class ServiceLevelAudit
     /**
      * Does user has permission to use system/service_report endpoint
      *
-     * @return void
+     * @return \Symfony\Component\HttpFoundation\Response|null the 403 response, or null when allowed
      */
     private function validateServiceReportRequest()
     {
-        if(MiddlewareHelper::requestUrlContains($this->request, 'system/service_report')){
+        if (MiddlewareHelper::addresses($this->request, 'system', 'service_report')) {
             if (!AdminUser::isCurrentUserRootAdmin()) {
-                throw new ForbiddenException('Service Reports only available for root admin.');
+                return MiddlewareHelper::forbiddenResponse('Service Reports only available for root admin.');
             }
 
             if (!LicenseCheck::isGoldLicense()) {
-                throw new ForbiddenException('Service reports are not available for your license. Please upgrade to Gold.');
+                return MiddlewareHelper::forbiddenResponse('Service reports are not available for your license. Please upgrade to Gold.');
             }
-        };
+        }
+
+        return null;
     }
 
     /**
-     * Is request goes to system/service, except GET requests
+     * Is the request dispatched to system/service, except GET requests
      *
      * @return bool
      */
     protected function isServiceRequest()
     {
         return $this->method !== Verbs::GET &&
-               MiddlewareHelper::requestUrlContains($this->request, 'system/service');
+               MiddlewareHelper::isRoutedTo($this->request, 'system', 'service');
+    }
+
+    /**
+     * Resource segments (e.g. ['service', '12']) of the routed target
+     *
+     * @return array
+     */
+    protected function getServiceResourceSegments()
+    {
+        $target = MiddlewareHelper::getRoutedTarget($this->request);
+
+        return MiddlewareHelper::targetMatches($target, 'system', ['service'], true) ? $target['resource'] : [];
     }
 
     /**
@@ -88,8 +106,8 @@ class ServiceLevelAudit
     protected function getServiceName($service)
     {
         $serviceName = '';
-        if (gettype($service) === "string") {
-            $serviceName = $this->getServiceNameById($service);
+        if (is_scalar($service)) {
+            $serviceName = $this->getServiceNameById((string)$service);
         } elseif (isset($service['id'])) {
             $serviceName = $this->getServiceNameById($service['id']);
         } elseif (isset($service['name'])) {
@@ -127,7 +145,9 @@ class ServiceLevelAudit
      */
     protected function getServiceIdFromResource()
     {
-        return Arr::get((!empty($this->resource)) ? explode('/', $this->resource) : [], 1);
+        $id = $this->resource[1] ?? null;
+
+        return ('' === $id) ? null : $id;
     }
 
     /**
@@ -190,18 +210,54 @@ class ServiceLevelAudit
     protected function getReportsData()
     {
         $reportsData = [];
-        if ($this->getServiceIdFromResource()) {
-            $reportsData[] = $this->getReportData($this->getServiceIdFromResource());
-        } elseif ($this->hasIdsParameter()) {
-            foreach ($this->getIdsFromPayload() as $serviceId) {
-                $reportsData[] = $this->getReportData($serviceId);
-            }
-        } elseif ($this->isResourceWrapped()) {
-            foreach ($this->payload['resource'] as $serviceData) {
+        foreach ($this->getAffectedServices() as $serviceData) {
+            if (is_array($serviceData) || is_scalar($serviceData)) {
                 $reportsData[] = $this->getReportData($serviceData);
-            };
+            }
         }
+
         return $reportsData;
+    }
+
+    /**
+     * Services the request works on, as ids or records, chosen in the same
+     * order as the system/service resource chooses them
+     *
+     * @return array
+     */
+    protected function getAffectedServices()
+    {
+        if ($id = $this->getServiceIdFromResource()) {
+            return [$id];
+        }
+
+        if ($this->method === Verbs::POST) {
+            return $this->getPayloadRecords();
+        }
+
+        if ($this->hasIdsParameter()) {
+            return $this->getIdsFromPayload();
+        }
+
+        if ($this->method === Verbs::DELETE && !empty($records = $this->getPayloadRecords())) {
+            return $records;
+        }
+
+        if (!empty($this->request->query('filter'))) {
+            return MiddlewareHelper::getIdsFromFilter(ServiceResource::class) ?? [];
+        }
+
+        return $this->getPayloadRecords();
+    }
+
+    /**
+     * Records in the request body (a list, or the body as one record)
+     *
+     * @return array
+     */
+    protected function getPayloadRecords()
+    {
+        return MiddlewareHelper::getRecordList($this->payload) ?? [];
     }
 
     /**
@@ -241,16 +297,6 @@ class ServiceLevelAudit
     }
 
     /**
-     * Is payload wrapped in resource array
-     *
-     * @return bool
-     */
-    protected function isResourceWrapped()
-    {
-        return isset($this->payload['resource']);
-    }
-
-    /**
      * Is request failed
      *
      * @param $response
@@ -268,17 +314,17 @@ class ServiceLevelAudit
      */
     protected function hasIdsParameter()
     {
-        return isset($this->payload['ids']);
+        return !empty($this->getIdsFromPayload());
     }
 
     /**
-     * Get ?ids= from the request
+     * Get ?ids= from the request (comma separated or a list)
      *
      * @return array
      */
     protected function getIdsFromPayload()
     {
-        return explode(',', $this->payload['ids']);
+        return MiddlewareHelper::getIdList($this->request->query('ids'));
     }
 
     /**
@@ -289,8 +335,8 @@ class ServiceLevelAudit
      */
     protected function getServiceId($serviceData)
     {
-        if (gettype($serviceData) === "string") {
-            return $serviceData;
+        if (is_scalar($serviceData)) {
+            return (string)$serviceData;
         } else {
             return $serviceData['id'] ?? null;
         }

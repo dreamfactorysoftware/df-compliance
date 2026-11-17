@@ -6,7 +6,6 @@ use DreamFactory\Core\Compliance\Components\RestrictedAdmin;
 use DreamFactory\Core\Compliance\Models\AdminUser;
 use DreamFactory\Core\Compliance\Utility\LicenseCheck;
 use DreamFactory\Core\Compliance\Utility\MiddlewareHelper;
-use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Enums\Verbs;
 
 use Closure;
@@ -16,12 +15,16 @@ class HandleRestrictedAdmin
     // Request methods restricted admin logic use
     const RESTRICTED_ADMIN_METHODS = [Verbs::POST, Verbs::PUT, Verbs::PATCH];
 
+    // system/admin sub-resources every admin may use for their own account
+    const OWN_ACCOUNT_RESOURCES = ['profile', 'session', 'password'];
+
     private $method;
-    private $reqPayload;
+    private $reqPayload = [];
+    private $reqRecords = null;
     private $resContent;
     private $request;
     private $response;
-    private $isRestrictedAdmin;
+    private $isRestrictedAdmin = false;
 
     /**
      * @param         $request
@@ -34,24 +37,24 @@ class HandleRestrictedAdmin
     {
         $this->request = $request;
         $this->method = $request->getMethod();
-        $this->reqPayload = $request->input();
-        // isRestrictedAdmin() reads the request payload, so it is safe to
-        // evaluate before the downstream handler runs.
-        $this->isRestrictedAdmin = $this->isRestrictedAdmin();
-
-        $isAdminRequest = $this->isAdminRequest();
 
         // Authorize BEFORE running the downstream handler. A rejected caller
         // must never reach the handler, or the write commits before the 403.
-        if ($isAdminRequest) {
-            if (!AdminUser::isCurrentUserRootAdmin()) {
-                throw new ForbiddenException('Only root admin can manage admins.');
-            }
+        if (!static::isAdminManagementRequest($request)) {
+            return $next($request);
+        }
 
-            if ($this->isRestrictedAdmin && in_array($this->method, self::RESTRICTED_ADMIN_METHODS)) {
-                if (!LicenseCheck::isGoldLicense()) {
-                    throw new ForbiddenException('Restricted admins are not available for your license. Please upgrade to Gold.');
-                };
+        if (!AdminUser::isCurrentUserRootAdmin()) {
+            return MiddlewareHelper::forbiddenResponse('Only root admin can manage admins.');
+        }
+
+        $this->reqPayload = MiddlewareHelper::getPayload($request);
+        $this->reqRecords = MiddlewareHelper::getRecordList($this->reqPayload);
+        $this->isRestrictedAdmin = $this->isRestrictedAdmin();
+
+        if ($this->isRestrictedAdmin && in_array($this->method, self::RESTRICTED_ADMIN_METHODS)) {
+            if (!LicenseCheck::isGoldLicense()) {
+                return MiddlewareHelper::forbiddenResponse('Restricted admins are not available for your license. Please upgrade to Gold.');
             }
         }
 
@@ -61,26 +64,86 @@ class HandleRestrictedAdmin
 
         // Post-process restricted-admin role creation. This needs the
         // response, so it stays after $next.
-        if ($isAdminRequest && $this->isRestrictedAdmin && $this->response->isSuccessful() && in_array($this->method, self::RESTRICTED_ADMIN_METHODS)) {
-            $this->resContent = $this->response->getOriginalContent();
-            $this->handleRestrictedAdmin();
-        };
-
+        if ($this->isRestrictedAdmin && in_array($this->method, self::RESTRICTED_ADMIN_METHODS) &&
+            static::isRoutedToAdmins($request) && $this->response->isSuccessful()
+        ) {
+            try {
+                $this->resContent = $this->response->getOriginalContent();
+                $this->handleRestrictedAdmin();
+            } catch (\Throwable $e) {
+                return MiddlewareHelper::errorResponse($e);
+            }
+        }
 
         return $this->response;
     }
 
     /**
-     * Does request go to system/admin/* endpoint (except system/admin/session)
+     * Does the request go to the system/admin endpoint, other than the caller's
+     * own system/admin/profile, system/admin/session and system/admin/password,
+     * or use the admin option of system/user.
+     *
+     * Targets from both the matched route parameters and the canonical request
+     * path are considered.
+     *
+     * @param \Illuminate\Http\Request $request
      *
      * @return bool
      */
-    private function isAdminRequest()
+    public static function isAdminManagementRequest($request)
     {
-        return MiddlewareHelper::requestUrlContains($this->request, 'system/admin') &&
-            !MiddlewareHelper::requestUrlContains($this->request, 'system/admin/profile') &&
-            !MiddlewareHelper::requestUrlContains($this->request, 'session') &&
-            !MiddlewareHelper::requestUrlContains($this->request, 'password');
+        foreach (MiddlewareHelper::getRequestTargets($request) as $target) {
+            if (static::isAdminsTarget($target)) {
+                return true;
+            }
+            if (MiddlewareHelper::targetMatches($target, 'system', ['user']) && static::hasAdminOption($request)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Is the request dispatched to the system/admin resource itself (not to
+     * the caller's own profile, session or password)
+     *
+     * @param \Illuminate\Http\Request $request
+     *
+     * @return bool
+     */
+    private static function isRoutedToAdmins($request)
+    {
+        $target = MiddlewareHelper::getRoutedTarget($request);
+
+        return MiddlewareHelper::targetMatches($target, 'system', ['admin'], true) && static::isAdminsTarget($target);
+    }
+
+    /**
+     * Does a target name the system/admin resource. The profile, session and
+     * password sub-resources are matched by exact name.
+     *
+     * @param array $target
+     *
+     * @return bool
+     */
+    private static function isAdminsTarget($target)
+    {
+        return MiddlewareHelper::targetMatches($target, 'system', ['admin']) &&
+            !in_array($target['resource'][1] ?? null, self::OWN_ACCOUNT_RESOURCES, true);
+    }
+
+    /**
+     * Is the admin option set (it makes system/user work with admin accounts)
+     *
+     * @param \Illuminate\Http\Request $request
+     *
+     * @return bool
+     */
+    private static function hasAdminOption($request)
+    {
+        return MiddlewareHelper::isTrue($request->input('admin')) ||
+            MiddlewareHelper::isTrue(MiddlewareHelper::getPayload($request)['admin'] ?? null);
     }
 
     /**
@@ -127,27 +190,26 @@ class HandleRestrictedAdmin
                         $restrictedAdminHelper->handleUserAppRole($isRestrictedAdmin, $adminData['id']);
                     } else {
                         $restrictedAdminHelper->deleteRole();
-                    };
+                    }
                     break;
                 }
         }
     }
 
     /**
+     * Does the request payload ask for a restricted admin
+     *
      * @return bool
      */
     private function isRestrictedAdmin()
     {
-        if (isset($this->reqPayload['resource'])) {
-            foreach ($this->reqPayload['resource'] as $key => $adminData) {
-                if (isset($adminData["is_restricted_admin"]) && $adminData['is_restricted_admin']) {
-                    return true;
-                }
+        foreach ($this->reqRecords ?? [$this->reqPayload] as $adminData) {
+            if (is_array($adminData) && !empty($adminData['is_restricted_admin'])) {
+                return true;
             }
-            return false;
-        } else {
-            return isset($this->reqPayload["is_restricted_admin"]) && $this->reqPayload["is_restricted_admin"];
         }
+
+        return false;
     }
 
     /**
@@ -193,10 +255,9 @@ class HandleRestrictedAdmin
     {
         $adminEmail = $adminData['email'] ?? '';
 
-        $isResourceWrapped = isset($this->reqPayload['resource']);
-        if ($isResourceWrapped) {
-            foreach ($this->reqPayload['resource'] as $adminRequestData) {
-                if ($adminEmail === $adminRequestData['email']) {
+        if (null !== $this->reqRecords) {
+            foreach ($this->reqRecords as $adminRequestData) {
+                if (is_array($adminRequestData) && $adminEmail === ($adminRequestData['email'] ?? null)) {
                     $adminData['access_by_tabs'] = $this->getAccessTabs($adminRequestData);
                     $adminData['is_restricted_admin'] = $this->getIsRestrictedAdmin($adminRequestData);
                 }

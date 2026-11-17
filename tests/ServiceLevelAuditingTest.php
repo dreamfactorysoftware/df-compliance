@@ -78,9 +78,8 @@ class ServiceLevelAuditingTest extends TestCase
         $nonRootAdminUser->is_sys_admin = true;
         $nonRootAdminUser->save();
         Session::setUserInfoWithJWT($nonRootAdminUser);
-        $response = $this->get('/api/v2/system/service_reports');
-        $response->assertStatus(500);
-        $this->assertEquals(403, $response->exception->getStatusCode());
-        $this->assertEquals('Service Reports only available for root admin.', $response->exception->getMessage());
+        $response = $this->get('/api/v2/system/service_report');
+        $response->assertStatus(403);
+        $this->assertEquals('Service Reports only available for root admin.', $response->json('error.message'));
     }
 }

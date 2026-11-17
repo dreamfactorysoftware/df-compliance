@@ -14,7 +14,6 @@ use DreamFactory\Core\Utility\JWTUtilities;
 use DreamFactory\Core\Models\App;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
-use DreamFactory\Core\Exceptions\ForbiddenException;
 use \Mockery as m;
 use ServiceManager;
 
@@ -97,21 +96,20 @@ class RestrictedAdminsTest extends TestCase
         $rq = Request::create("http://localhost/api/v2/system/role/" . $role->id, "PUT", ['id' => $role->id,], [], [], [], []);
         $rq->headers->set('HTTP_X_DREAMFACTORY_SESSION_TOKEN', $token);
         $rq->headers->set('X-Dreamfactory-API-Key', $apiKey);
-        $routeMock = m::mock(Route::class)
-            ->shouldReceive('parameter')
-            ->with('resource')
-            ->andReturn('role/' . $role->id);
-        $rq->setRouteResolver(function () use ($rq, $routeMock) {
-            return ($routeMock->getMock());
+        $rq->setRouteResolver(function () use ($rq) {
+            return (new Route('PUT', 'api/{version}/{service}/{resource?}', []))
+                ->where(['resource' => '.*'])
+                ->bind($rq);
         });
-        try {
-            $middleware = new HandleRestrictedAdminRole();
-            $middleware->handle($rq, function () {
-            });
-        } catch (\Throwable $e) {
-        }
-        $this->assertEquals(403, $e->getStatusCode());
-        $this->assertEquals('You do not have permission to modify restricted admin roles. Please contact your root administrator.', $e->getMessage());
+        $nextCalled = false;
+        $middleware = new HandleRestrictedAdminRole();
+        $response = $middleware->handle($rq, function () use (&$nextCalled) {
+            $nextCalled = true;
+        });
+        $this->assertFalse($nextCalled);
+        $this->assertEquals(403, $response->getStatusCode());
+        $this->assertEquals('You do not have permission to modify restricted admin roles. Please contact your root administrator.',
+            json_decode($response->getContent(), true)['error']['message']);
     }
 
     public function testNonRootAdminsCannotManageAdmins()
@@ -122,16 +120,27 @@ class RestrictedAdminsTest extends TestCase
         $nonRootAdmin->save();
         Session::setUserInfoWithJWT($nonRootAdmin);
         $response = $this->get('/api/v2/system/admin');
-        $response->assertStatus(500);
-        $this->assertEquals(403, $response->exception->getStatusCode());
-        $this->assertEquals('Only root admin can manage admins.', $response->exception->getMessage());
+        $response->assertStatus(403);
+        $this->assertEquals('Only root admin can manage admins.', $response->json('error.message'));
+
+        $response = $this->get('/api/v2/system/admin/profile');
+        $response->assertStatus(200);
 
         $role = $this->createRARole();
         Session::setUserInfoWithJWT($nonRootAdmin);
         $response = $this->delete('/api/v2/system/role/' . $role->id);
-        $response->assertStatus(500);
-        $this->assertEquals(403, $response->exception->getStatusCode());
-        $this->assertEquals('You do not have permission to modify restricted admin roles. Please contact your root administrator.', $response->exception->getMessage());
+        $response->assertStatus(403);
+        $this->assertEquals('You do not have permission to modify restricted admin roles. Please contact your root administrator.', $response->json('error.message'));
+
+        Session::setUserInfoWithJWT($nonRootAdmin);
+        $response = $this->patch('/api/v2/system/role', ['resource' => [['id' => $role->id, 'description' => 'changed']]]);
+        $response->assertStatus(403);
+        $this->assertEquals('You do not have permission to modify restricted admin roles. Please contact your root administrator.', $response->json('error.message'));
+
+        Session::setUserInfoWithJWT($nonRootAdmin);
+        $response = $this->json('PATCH', '/api/v2/system/role', [['id' => $role->id, 'description' => 'changed']]);
+        $response->assertStatus(403);
+        $this->assertEquals('You do not have permission to modify restricted admin roles. Please contact your root administrator.', $response->json('error.message'));
     }
 
     /**
@@ -158,21 +167,15 @@ class RestrictedAdminsTest extends TestCase
 
         $nextCalled = false;
         $middleware = new HandleRestrictedAdmin();
-        $thrown = null;
-        try {
-            $middleware->handle($rq, function () use (&$nextCalled) {
-                $nextCalled = true;
-                return m::mock('Illuminate\Http\Response');
-            });
-        } catch (ForbiddenException $e) {
-            $thrown = $e;
-        }
+        $response = $middleware->handle($rq, function () use (&$nextCalled) {
+            $nextCalled = true;
+            return m::mock('Illuminate\Http\Response');
+        });
 
         // The handler ($next) must never run: the write is prevented, not undone.
         $this->assertFalse($nextCalled, 'Downstream handler ran before authorization; write would commit.');
-        $this->assertNotNull($thrown, 'Non-root admin was not rejected.');
-        $this->assertEquals(403, $thrown->getStatusCode());
-        $this->assertEquals('Only root admin can manage admins.', $thrown->getMessage());
+        $this->assertEquals(403, $response->getStatusCode());
+        $this->assertEquals('Only root admin can manage admins.', json_decode($response->getContent(), true)['error']['message']);
     }
 
     public function testConfigTabGrantsServerSettingAccess()

@@ -2,6 +2,7 @@
 
 namespace DreamFactory\Core\Compliance\Models;
 
+use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Utility\Session;
 use DreamFactory\Core\Models\AdminUser as CoreAdminUser;
 
@@ -38,6 +39,42 @@ class AdminUser extends CoreAdminUser
     {
         $currentUser = self::whereId(Session::getCurrentUserId())->first();
         return $currentUser->is_root_admin;
+    }
+
+    /**
+     * Only a root admin may create, change or delete an admin. This runs on
+     * the model, so it holds for every route that reaches the user table.
+     *
+     * Allowed without root: the first admin (no root exists yet), an admin
+     * editing their own record, and flows with no session user (login
+     * timestamp, password reset). None of these may grant admin rights.
+     *
+     * @param \DreamFactory\Core\Models\User $user
+     * @param bool                             $deleting
+     *
+     * @throws ForbiddenException
+     */
+    public static function authorizeChange($user, $deleting = false)
+    {
+        $isAdmin = $user->is_sys_admin || $user->getOriginal('is_sys_admin');
+        if (!$isAdmin && !$user->isDirty('is_root_admin')) {
+            return;
+        }
+        if (!static::doesRootAdminExist()) {
+            return;
+        }
+
+        $callerId = Session::getCurrentUserId();
+        if ($callerId && static::isRootById($callerId)) {
+            return;
+        }
+
+        $grants = $deleting || !$user->exists || $user->isDirty('is_sys_admin') || $user->isDirty('is_root_admin');
+        if (!$grants && (!$callerId || $callerId == $user->id)) {
+            return;
+        }
+
+        throw new ForbiddenException('Only root admin can manage admins.');
     }
 
     /**

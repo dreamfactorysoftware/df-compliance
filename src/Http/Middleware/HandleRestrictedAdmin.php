@@ -5,7 +5,6 @@ namespace DreamFactory\Core\Compliance\Http\Middleware;
 use DreamFactory\Core\Compliance\Components\RestrictedAdmin;
 use DreamFactory\Core\Compliance\Models\AdminUser;
 use DreamFactory\Core\Compliance\Utility\LicenseCheck;
-use DreamFactory\Core\Compliance\Utility\MiddlewareHelper;
 use DreamFactory\Core\Exceptions\ForbiddenException;
 use DreamFactory\Core\Enums\Verbs;
 
@@ -77,10 +76,10 @@ class HandleRestrictedAdmin
      */
     private function isAdminRequest()
     {
-        return MiddlewareHelper::requestUrlContains($this->request, 'system/admin') &&
-            !MiddlewareHelper::requestUrlContains($this->request, 'system/admin/profile') &&
-            !MiddlewareHelper::requestUrlContains($this->request, 'session') &&
-            !MiddlewareHelper::requestUrlContains($this->request, 'password');
+        $path = strtolower($this->request->decodedPath());
+
+        return preg_match('#(^|/)system/admin(/|$)#', $path) &&
+            !preg_match('#(^|/)system/admin/(profile|session|password)(/|$)#', $path);
     }
 
     /**

@@ -175,6 +175,104 @@ class RestrictedAdminsTest extends TestCase
         $this->assertEquals('Only root admin can manage admins.', $thrown->getMessage());
     }
 
+    /**
+     * The path match must not depend on the Host header, letter case or
+     * percent-encoding. Each of these URLs reaches the admin resource.
+     */
+    public function testAdminPathMatchIgnoresHostCaseAndEncoding()
+    {
+        $nonRootAdmin = $this->makeAdmin($this->nonRootAdminData);
+        Session::setUserInfoWithJWT($nonRootAdmin);
+
+        $urls = [
+            'http://session.localhost/api/v2/system/admin',
+            'http://password.localhost/api/v2/system/admin',
+            'http://localhost/api/v2/SYSTEM/admin',
+            'http://localhost/api/v2/system/%61dmin',
+        ];
+        foreach ($urls as $url) {
+            $rq = Request::create($url, 'POST', $this->adminRequstData);
+            $nextCalled = false;
+            $thrown = null;
+            try {
+                (new HandleRestrictedAdmin())->handle($rq, function () use (&$nextCalled) {
+                    $nextCalled = true;
+                    return m::mock('Illuminate\Http\Response');
+                });
+            } catch (ForbiddenException $e) {
+                $thrown = $e;
+            }
+            $this->assertFalse($nextCalled, "Handler ran for $url");
+            $this->assertNotNull($thrown, "Not rejected: $url");
+        }
+    }
+
+    /**
+     * The model guard holds on every route, because it does not look at the
+     * route. Only a root admin may create, change or delete an admin.
+     */
+    public function testModelGuardAllowsOnlyRootToManageAdmins()
+    {
+        $root = $this->makeAdmin($this->rootAdminData, true);
+        $nonRoot = $this->makeAdmin($this->nonRootAdminData);
+        $other = $this->makeAdmin($this->raAdminData);
+
+        $denied = function (callable $change) {
+            try {
+                $change();
+            } catch (ForbiddenException $e) {
+                return true;
+            }
+            return false;
+        };
+        $newAdmin = function () {
+            $user = new \DreamFactory\Core\Models\User();
+            $user->is_sys_admin = true;
+            return $user;
+        };
+
+        Session::setUserInfoWithJWT($nonRoot);
+        $this->assertTrue($denied(function () use ($newAdmin) {
+            AdminUser::authorizeChange($newAdmin());
+        }), 'non-root created an admin');
+        $this->assertTrue($denied(function () use ($other) {
+            $other->first_name = 'changed';
+            AdminUser::authorizeChange($other);
+        }), 'non-root changed another admin');
+        $this->assertTrue($denied(function () use ($other) {
+            AdminUser::authorizeChange($other->fresh(), true);
+        }), 'non-root deleted another admin');
+        $this->assertTrue($denied(function () use ($nonRoot) {
+            $self = $nonRoot->fresh();
+            $self->is_root_admin = true;
+            AdminUser::authorizeChange($self);
+        }), 'non-root made itself root');
+        $this->assertFalse($denied(function () use ($nonRoot) {
+            $self = $nonRoot->fresh();
+            $self->first_name = 'mine';
+            AdminUser::authorizeChange($self);
+        }), 'non-root could not edit its own record');
+
+        Session::setUserInfoWithJWT($root);
+        $this->assertFalse($denied(function () use ($newAdmin) {
+            AdminUser::authorizeChange($newAdmin());
+        }), 'root could not create an admin');
+        $this->assertFalse($denied(function () use ($other) {
+            AdminUser::authorizeChange($other->fresh(), true);
+        }), 'root could not delete an admin');
+    }
+
+    private function makeAdmin(array $data, $root = false)
+    {
+        AdminUser::create($data);
+        $admin = AdminUser::whereEmail($data['email'])->first();
+        $admin->is_sys_admin = true;
+        $admin->is_root_admin = $root;
+        $admin->save();
+
+        return $admin;
+    }
+
     public function testConfigTabGrantsServerSettingAccess()
     {
         $role = $this->createRARole(['config']);

@@ -14,6 +14,8 @@ use DreamFactory\Core\Compliance\Http\Middleware\DoesRootAdminExist;
 use DreamFactory\Core\Compliance\Http\Middleware\HandleRestrictedAdminRole;
 use DreamFactory\Core\Compliance\Http\Middleware\MarkAsRootAdmin;
 use DreamFactory\Core\Compliance\Http\Middleware\ServiceLevelAudit;
+use DreamFactory\Core\Compliance\Models\AdminUser;
+use DreamFactory\Core\Models\User;
 use Illuminate\Routing\Router;
 
 use Route;
@@ -33,6 +35,24 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
 
         $this->addMiddleware();
         $this->addCommands();
+        $this->addAdminGuard();
+    }
+
+    /**
+     * Guard admin accounts at the model, not the URL. The console (setup,
+     * root admin command) is trusted and skips the guard.
+     *
+     * @return void
+     */
+    protected function addAdminGuard()
+    {
+        foreach (['saving' => false, 'deleting' => true] as $event => $deleting) {
+            Event::listen("eloquent.$event: *", function ($name, array $data) use ($deleting) {
+                if (($data[0] ?? null) instanceof User && !$this->app->runningInConsole()) {
+                    AdminUser::authorizeChange($data[0], $deleting);
+                }
+            });
+        }
     }
 
     public function register(){

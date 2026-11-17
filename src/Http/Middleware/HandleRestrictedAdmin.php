@@ -35,23 +35,33 @@ class HandleRestrictedAdmin
         $this->request = $request;
         $this->method = $request->getMethod();
         $this->reqPayload = $request->input();
-        $this->response = $next($request);
-        $this->resContent = $this->response;
+        // isRestrictedAdmin() reads the request payload, so it is safe to
+        // evaluate before the downstream handler runs.
         $this->isRestrictedAdmin = $this->isRestrictedAdmin();
 
-        if (!$this->isAdminRequest()) {
-            return $this->response;
+        $isAdminRequest = $this->isAdminRequest();
+
+        // Authorize BEFORE running the downstream handler. A rejected caller
+        // must never reach the handler, or the write commits before the 403.
+        if ($isAdminRequest) {
+            if (!AdminUser::isCurrentUserRootAdmin()) {
+                throw new ForbiddenException('Only root admin can manage admins.');
+            }
+
+            if ($this->isRestrictedAdmin && in_array($this->method, self::RESTRICTED_ADMIN_METHODS)) {
+                if (!LicenseCheck::isGoldLicense()) {
+                    throw new ForbiddenException('Restricted admins are not available for your license. Please upgrade to Gold.');
+                };
+            }
         }
 
-        if (!AdminUser::isCurrentUserRootAdmin()) {
-            throw new ForbiddenException('Only root admin can manage admins.');
-        }
+        // Authorization passed. Now run the handler.
+        $this->response = $next($request);
+        $this->resContent = $this->response;
 
-        if ($this->isRestrictedAdmin && $this->response->isSuccessful() && in_array($this->method, self::RESTRICTED_ADMIN_METHODS)) {
-            if (!LicenseCheck::isGoldLicense()) {
-                throw new ForbiddenException('Restricted admins are not available for your license. Please upgrade to Gold.');
-            };
-
+        // Post-process restricted-admin role creation. This needs the
+        // response, so it stays after $next.
+        if ($isAdminRequest && $this->isRestrictedAdmin && $this->response->isSuccessful() && in_array($this->method, self::RESTRICTED_ADMIN_METHODS)) {
             $this->resContent = $this->response->getOriginalContent();
             $this->handleRestrictedAdmin();
         };

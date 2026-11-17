@@ -134,6 +134,47 @@ class RestrictedAdminsTest extends TestCase
         $this->assertEquals('You do not have permission to modify restricted admin roles. Please contact your root administrator.', $response->exception->getMessage());
     }
 
+    /**
+     * The root-admin authorization must gate the downstream handler.
+     * A non-root admin POSTing to system/admin must be rejected BEFORE $next
+     * runs, so the handler never commits an admin row.
+     */
+    public function testNonRootAdminRejectedBeforeHandlerRuns()
+    {
+        AdminUser::create($this->nonRootAdminData);
+        $nonRootAdmin = AdminUser::whereEmail($this->nonRootAdminData['email'])->first();
+        $nonRootAdmin->is_sys_admin = true;
+        $nonRootAdmin->save();
+        Session::setUserInfoWithJWT($nonRootAdmin);
+        $token = JWTUtilities::makeJWTByUser($nonRootAdmin->id, $nonRootAdmin->email);
+        $apiKey = App::find(1)->api_key;
+
+        $rq = Request::create("http://localhost/api/v2/system/admin", "POST", $this->adminRequstData, [], [], [], []);
+        $rq->headers->set('HTTP_X_DREAMFACTORY_SESSION_TOKEN', $token);
+        $rq->headers->set('X-Dreamfactory-API-Key', $apiKey);
+        $rq->setRouteResolver(function () use ($rq) {
+            return (new Route('POST', 'api/{version}/{service}/{resource?}', []))->bind($rq);
+        });
+
+        $nextCalled = false;
+        $middleware = new HandleRestrictedAdmin();
+        $thrown = null;
+        try {
+            $middleware->handle($rq, function () use (&$nextCalled) {
+                $nextCalled = true;
+                return m::mock('Illuminate\Http\Response');
+            });
+        } catch (ForbiddenException $e) {
+            $thrown = $e;
+        }
+
+        // The handler ($next) must never run: the write is prevented, not undone.
+        $this->assertFalse($nextCalled, 'Downstream handler ran before authorization; write would commit.');
+        $this->assertNotNull($thrown, 'Non-root admin was not rejected.');
+        $this->assertEquals(403, $thrown->getStatusCode());
+        $this->assertEquals('Only root admin can manage admins.', $thrown->getMessage());
+    }
+
     public function testConfigTabGrantsServerSettingAccess()
     {
         $role = $this->createRARole(['config']);

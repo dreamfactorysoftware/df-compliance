@@ -63,7 +63,7 @@ class ServiceLevelAuditingTest extends TestCase
             return (new Route('POST', 'api/{version}/{service}/{resource?}', []))->bind($rq);
         });
         $response = Mockery::mock('Illuminate\Http\Response')->shouldReceive('getOriginalContent')->once()->andReturn('blah')->getMock();
-        $response->shouldReceive('status')->once()->andReturn('blah');
+        $response->shouldReceive('status')->once()->andReturn(200);
         $middleware = new ServiceLevelAudit();
         $middleware->handle($rq, function () use ($response) {
             return $response;
@@ -78,9 +78,8 @@ class ServiceLevelAuditingTest extends TestCase
         $nonRootAdminUser->is_sys_admin = true;
         $nonRootAdminUser->save();
         Session::setUserInfoWithJWT($nonRootAdminUser);
-        $response = $this->get('/api/v2/system/service_reports');
-        $response->assertStatus(500);
-        $this->assertEquals(403, $response->exception->getStatusCode());
-        $this->assertEquals('Service Reports only available for root admin.', $response->exception->getMessage());
+        $response = $this->get('/api/v2/system/service_report');
+        $response->assertStatus(403);
+        $this->assertEquals('Service Reports only available for root admin.', $response->json('error.message'));
     }
 }

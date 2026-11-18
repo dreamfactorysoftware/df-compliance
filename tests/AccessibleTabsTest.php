@@ -52,15 +52,16 @@ class AccessibleTabsTest extends TestCase
         $response->shouldReceive('setContent')->with(['id' => 0, 'accessible_tabs' => [
             0 => "apps",
             1 => "users",
-            2 => "services",
-            3 => "apidocs",
-            4 => "schema/data",
-            5 => "files",
-            6 => "scripts",
-            7 => "config",
-            8 => "packages",
-            9 => "limits",
-            10 => "scheduler"
+            2 => "roles",
+            3 => "services",
+            4 => "apidocs",
+            5 => "schema/data",
+            6 => "files",
+            7 => "scripts",
+            8 => "config",
+            9 => "packages",
+            10 => "limits",
+            11 => "scheduler"
         ]]);
         $middleware = new AccessibleTabs();
         $middleware->handle($rq, function () use ($response) {

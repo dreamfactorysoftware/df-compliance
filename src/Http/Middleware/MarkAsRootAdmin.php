@@ -25,11 +25,11 @@ class MarkAsRootAdmin
         $this->method = $request->getMethod();
         $response = $next($request);
 
-        if (!$this->isSessionRequest()) {
+        if (!$this->isSessionRequest() || !method_exists($response, 'getOriginalContent')) {
             return $response;
         }
 
-        if(is_array($content = $response->getOriginalContent()) && method_exists($response,'getOriginalContent')) {
+        if (is_array($content = $response->getOriginalContent()) && !isset($content['error'])) {
             $content['is_root_admin'] = isset($content['id']) && AdminUser::isRootById($content['id']);
             $response->setContent($content);
         }
@@ -37,12 +37,13 @@ class MarkAsRootAdmin
     }
 
     /**
-     * Does request go to admin/session
+     * Does request go to system/admin/session or user/session
      *
      * @return bool
      */
     private function isSessionRequest()
     {
-        return MiddlewareHelper::requestUrlContains($this->request, 'session');
+        return MiddlewareHelper::isRoutedTo($this->request, 'system', 'admin', 'session') ||
+            MiddlewareHelper::isRoutedTo($this->request, 'user', 'session');
     }
 }

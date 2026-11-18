@@ -89,7 +89,11 @@ class RootAdminMigrationTest extends TestCase
         $files = array_map('basename', glob(dirname(__DIR__) . '/database/migrations/*.php'));
         sort($files);
 
-        $this->assertSame(self::MIGRATION, end($files));
+        // the 7.8 migrations of this package run last, root administrator first
+        $this->assertSame(
+            [self::MIGRATION, '2026_11_18_000100_include_server_settings_for_config_restricted_admins.php'],
+            array_slice($files, -2)
+        );
     }
 
     public function testLowestIdActiveAdminBecomesRoot()

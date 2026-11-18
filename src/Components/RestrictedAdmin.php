@@ -298,8 +298,8 @@ class RestrictedAdmin
         $hasAccess = true;
         foreach ($tabAccess as $access) {
             // optional entries are granted on create/update but not needed to detect the tab, so
-            // restricted admins created before server_setting/* existed keep Config. Drop the flag once
-            // existing roles are backfilled.
+            // restricted admins created before server_setting/* existed keep Config. The
+            // 2026_11_18_000100 migration adds it to those roles; keep the flag for any role it skipped.
             if (!empty($access['optional'])) {
                 continue;
             }

@@ -739,6 +739,114 @@ class RestrictedAdminsTest extends TestCase
         $this->assertSame(0, RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->count());
     }
 
+    public function testUpgradeIncludesServerSettingForConfigRestrictedAdmin()
+    {
+        $role = $this->createRARole(['config', 'users']);
+        $saved = $this->serverSettingRows($role->id);
+        $this->assertCount(1, $saved);
+        // a restricted admin created before server_setting/* joined the Config tab
+        RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->delete();
+        // a root admin narrowed one row of the tab; the upgrade must keep it as it is
+        RoleServiceAccess::whereRoleId($role->id)->whereComponent('cors/*')->update(['requestor_mask' => 1]);
+        $before = $this->roleAccessRows($role->id);
+
+        $this->runServerSettingMigration();
+
+        $rows = $this->serverSettingRows($role->id);
+        $this->assertCount(1, $rows);
+        // same access the admin save grants
+        $this->assertSame(
+            array_diff_key($saved[0], ['id' => 0]),
+            array_diff_key($rows[0], ['id' => 0])
+        );
+        $this->assertSame((int)ServiceManager::getServiceIdByName('system'), (int)$rows[0]['service_id']);
+        $this->assertSame(VerbsMask::getFullAccessMask(), (int)$rows[0]['verb_mask']);
+        $this->assertSame($before, array_values(array_filter($this->roleAccessRows($role->id), function ($row) {
+            return $row['component'] !== 'server_setting/*';
+        })));
+        $tabs = RestrictedAdmin::getAccessibleTabsByRoleId($role->id);
+        $this->assertContains('config', $tabs);
+        $this->assertContains('users', $tabs);
+        $this->assertSame(1, Role::whereName($this->raAdminData['email'] . '\'s role')->count());
+    }
+
+    public function testUpgradeMigrationRunsAgainWithoutChanges()
+    {
+        $role = $this->createRARole(['config']);
+        RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->delete();
+
+        $this->runServerSettingMigration();
+        $once = $this->roleAccessRows($role->id);
+        $this->runServerSettingMigration();
+
+        $this->assertSame($once, $this->roleAccessRows($role->id));
+        $this->assertCount(1, $this->serverSettingRows($role->id));
+    }
+
+    public function testUpgradeKeepsNarrowedServerSettingRow()
+    {
+        $role = $this->createRARole(['config']);
+        RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->update(['verb_mask' => 1]);
+        $before = $this->roleAccessRows($role->id);
+
+        $this->runServerSettingMigration();
+
+        $this->assertSame($before, $this->roleAccessRows($role->id));
+    }
+
+    public function testUpgradeLeavesRestrictedAdminsWithoutConfigTab()
+    {
+        $role = $this->createRARole(['users', 'scripts']);
+        $before = $this->roleAccessRows($role->id);
+
+        $this->runServerSettingMigration();
+
+        $this->assertSame($before, $this->roleAccessRows($role->id));
+        $this->assertCount(0, $this->serverSettingRows($role->id));
+    }
+
+    public function testUpgradeSkipsRoleNotNamedForTheAdmin()
+    {
+        $role = $this->createRARole(['config']);
+        RoleServiceAccess::whereRoleId($role->id)->whereComponent('server_setting/*')->delete();
+        Role::whereId($role->id)->update(['name' => 'renamed admin role']);
+        $before = $this->roleAccessRows($role->id);
+
+        try {
+            $this->runServerSettingMigration();
+
+            $this->assertSame($before, $this->roleAccessRows($role->id));
+            $this->assertSame(0, Role::whereName($this->raAdminData['email'] . '\'s role')->count());
+        } finally {
+            Role::whereName('renamed admin role')->delete();
+        }
+    }
+
+    private function runServerSettingMigration()
+    {
+        // the migration runs from `php artisan migrate`, without a session user
+        Session::flush();
+        AdminUser::setConsoleCommand('migrate');
+        $migration = require dirname(__DIR__) .
+            '/database/migrations/2026_11_18_000100_include_server_settings_for_config_restricted_admins.php';
+        $migration->up();
+        AdminUser::setConsoleCommand(false);
+    }
+
+    private function roleAccessRows($roleId)
+    {
+        return RoleServiceAccess::whereRoleId($roleId)->orderBy('id')
+            ->get(['id', 'service_id', 'component', 'verb_mask', 'requestor_mask', 'filters', 'filter_op'])
+            ->toArray();
+    }
+
+    private function serverSettingRows($roleId)
+    {
+        return array_values(array_filter($this->roleAccessRows($roleId), function ($row) {
+            return $row['component'] === 'server_setting/*';
+        }));
+    }
+
     public function createRARole(array $tabs = ['users'])
     {
         // Create a RA role

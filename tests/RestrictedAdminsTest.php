@@ -265,8 +265,9 @@ class RestrictedAdminsTest extends TestCase
     }
 
     /**
-     * With no session user, only sign-in and password fields may change on an
-     * admin, and nothing may create an admin or change the admin flags.
+     * With no session user, only sign-in fields may change on an admin
+     * outside the password and sign-in endpoints, and nothing may create an
+     * admin or change the admin flags.
      */
     public function testModelGuardWithoutSessionUser()
     {
@@ -296,9 +297,169 @@ class RestrictedAdminsTest extends TestCase
             $self = $other->fresh();
             $self->last_login_date = date('Y-m-d H:i:s');
             $self->confirm_code = null;
+            AdminUser::authorizeChange($self);
+        }), 'sign-in fields refused without a session user');
+        $this->assertTrue($this->refused(function () use ($other) {
+            $self = $other->fresh();
             $self->password = 'another-password-1234';
             AdminUser::authorizeChange($self);
-        }), 'sign-in or password fields refused without a session user');
+        }), 'admin password changed without a session user outside the password endpoints');
+    }
+
+    /**
+     * Password and sign-in fields of an admin may change on the password and
+     * sign-in endpoints, whoever is signed in. Other endpoints and artisan
+     * commands, including scheduled tasks, may not change them.
+     */
+    public function testPasswordFieldsChangeOnPasswordAndSignInEndpoints()
+    {
+        $this->makeAdmin($this->rootAdminData, true);
+        $nonRoot = $this->makeAdmin($this->nonRootAdminData);
+        $other = $this->makeAdmin($this->raAdminData);
+        $resetByCode = function () use ($other) {
+            $self = $other->fresh();
+            $self->confirm_code = null;
+            $self->password = 'another-password-1234';
+            AdminUser::authorizeChange($self);
+        };
+        $originalRequest = app('request');
+
+        try {
+            AdminUser::setConsoleCommand(null);
+            Session::flush();
+            foreach (['user/password', 'system/admin/password', 'user/session', 'system/admin/session'] as $path) {
+                app()->instance('request', Request::create('http://localhost/api/v2/' . $path, 'POST'));
+                $this->assertTrue(AdminUser::isCredentialRequest(), $path);
+                $this->assertFalse($this->refused($resetByCode), 'password refused on ' . $path);
+            }
+
+            Session::setUserInfoWithJWT($nonRoot);
+            app()->instance('request', Request::create('http://localhost/api/v2/user/password', 'POST'));
+            $this->assertFalse($this->refused($resetByCode), 'password reset refused while another admin is signed in');
+            $this->assertTrue($this->refused(function () use ($other) {
+                $self = $other->fresh();
+                $self->first_name = 'changed';
+                AdminUser::authorizeChange($self);
+            }), 'non-root changed another admin profile on the password endpoint');
+
+            Session::flush();
+            foreach (['system/admin/' . $other->id, 'system/user', 'user/password/extra', 'user/profile', 'system/script'] as $path) {
+                app()->instance('request', Request::create('http://localhost/api/v2/' . $path, 'PATCH'));
+                $this->assertFalse(AdminUser::isCredentialRequest(), $path);
+                $this->assertTrue($this->refused($resetByCode), 'password changed on ' . $path);
+            }
+
+            app()->instance('request', Request::create('http://localhost/api/v2/user/password', 'POST'));
+            foreach (['df:scheduled-request', 'queue:work', 'schedule:run'] as $command) {
+                AdminUser::setConsoleCommand($command);
+                $this->assertFalse(AdminUser::isCredentialRequest(), $command);
+                $this->assertTrue($this->refused($resetByCode), 'password changed by ' . $command);
+            }
+        } finally {
+            app()->instance('request', $originalRequest);
+        }
+    }
+
+    /**
+     * Restricted admin roles, their service access and lookups, and an
+     * admin's role assignments and lookups are changed only by a root admin.
+     * Records of ordinary users and roles are not affected.
+     */
+    public function testAdminRolesAndRelatedRecordsNeedRoot()
+    {
+        $root = $this->makeAdmin($this->rootAdminData, true);
+        $nonRoot = $this->makeAdmin($this->nonRootAdminData);
+        $other = $this->makeAdmin($this->raAdminData);
+        $plain = \DreamFactory\Core\Models\User::create(['name' => 'Plain User', 'email' => 'plain-user@dreamfactory.com']);
+        $appId = App::query()->value('id');
+        $serviceId = \DreamFactory\Core\Models\Service::query()->value('id');
+        AdminUser::setConsoleCommand('queue:work');
+
+        \DB::beginTransaction();
+        try {
+            Session::setUserInfoWithJWT($root);
+            $role = Role::create(['name' => 'admin-role-' . uniqid(), 'is_active' => 1]);
+            $assignment = \DreamFactory\Core\Models\UserAppRole::create(['user_id' => $other->id, 'app_id' => $appId, 'role_id' => $role->id]);
+            $access = RoleServiceAccess::create(['role_id' => $role->id, 'service_id' => $serviceId, 'component' => '*', 'verb_mask' => 1, 'requestor_mask' => 1]);
+            $plainRole = Role::create(['name' => 'plain-role-' . uniqid(), 'is_active' => 1]);
+
+            $changes = [
+                'role'            => function () use ($role) {
+                    $mine = $role->fresh();
+                    $mine->description = 'changed';
+                    $mine->save();
+                },
+                'role delete'     => function () use ($role) {
+                    $role->fresh()->delete();
+                },
+                'service access'  => function () use ($role, $serviceId) {
+                    RoleServiceAccess::create(['role_id' => $role->id, 'service_id' => $serviceId, 'component' => 'admin/*', 'verb_mask' => 31, 'requestor_mask' => 3]);
+                },
+                'access update'   => function () use ($access) {
+                    $mine = $access->fresh();
+                    $mine->verb_mask = 31;
+                    $mine->save();
+                },
+                'access move'     => function () use ($access, $plainRole) {
+                    $mine = $access->fresh();
+                    $mine->role_id = $plainRole->id;
+                    $mine->save();
+                },
+                'role lookup'     => function () use ($role) {
+                    \DreamFactory\Core\Models\RoleLookup::create(['role_id' => $role->id, 'name' => 'admin_role_value', 'value' => 'x']);
+                },
+                'assignment'      => function () use ($assignment, $plainRole) {
+                    $mine = $assignment->fresh();
+                    $mine->role_id = $plainRole->id;
+                    $mine->save();
+                },
+                'assignment delete' => function () use ($assignment) {
+                    $assignment->fresh()->delete();
+                },
+                'new assignment'  => function () use ($nonRoot, $appId, $role) {
+                    \DreamFactory\Core\Models\UserAppRole::create(['user_id' => $nonRoot->id, 'app_id' => $appId, 'role_id' => $role->id]);
+                },
+                'user lookup'     => function () use ($other) {
+                    \DreamFactory\Core\Models\UserLookup::create(['user_id' => $other->id, 'name' => 'admin_value', 'value' => 'x']);
+                },
+            ];
+
+            foreach ([$nonRoot, null] as $caller) {
+                $caller ? Session::setUserInfoWithJWT($caller) : Session::flush();
+                foreach ($changes as $name => $change) {
+                    $this->assertTrue($this->refused($change), ($caller ? 'non-root' : 'no session user') . ' changed ' . $name);
+                }
+            }
+            $this->assertNull($role->fresh()->description);
+            $this->assertEquals(1, $access->fresh()->verb_mask);
+            $this->assertEquals($role->id, $assignment->fresh()->role_id);
+
+            Session::setUserInfoWithJWT($nonRoot);
+            $this->assertFalse($this->refused(function () use ($plainRole, $plain, $appId, $serviceId) {
+                $plainRole->description = 'changed';
+                $plainRole->save();
+                RoleServiceAccess::create(['role_id' => $plainRole->id, 'service_id' => $serviceId, 'component' => '*', 'verb_mask' => 1, 'requestor_mask' => 1]);
+                \DreamFactory\Core\Models\UserAppRole::create(['user_id' => $plain->id, 'app_id' => $appId, 'role_id' => $plainRole->id]);
+                \DreamFactory\Core\Models\UserLookup::create(['user_id' => $plain->id, 'name' => 'plain_value', 'value' => 'x']);
+            }), 'non-root could not change ordinary roles and users');
+
+            Session::setUserInfoWithJWT($root);
+            foreach ($changes as $name => $change) {
+                if ('role delete' !== $name && 'assignment delete' !== $name) {
+                    $this->assertFalse($this->refused($change), 'root could not change ' . $name);
+                }
+            }
+
+            // Sign-in services apply their configured roles to the user signing in.
+            Session::flush();
+            \DreamFactory\Core\Models\UserAppRole::whereUserId($other->id)->delete();
+            $this->assertFalse($this->refused(function () use ($other, $plainRole) {
+                \DreamFactory\Core\Models\User::applyDefaultUserAppRole($other, $plainRole->id);
+            }), 'sign-in role assignment refused');
+            $this->assertTrue(\DreamFactory\Core\Models\UserAppRole::whereUserId($other->id)->exists());
+        } finally {
+            \DB::rollBack();
+        }
     }
 
     /**

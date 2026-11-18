@@ -39,10 +39,11 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
     }
 
     /**
-     * Check admin account changes on the model, not only on the URL. Operator
-     * console commands (setup, the root admin command) skip the check;
-     * other console work does not. Scheduled tasks that run as another
-     * admin are checked when they are saved.
+     * Check admin account changes on the model, not only on the URL. This
+     * covers admin accounts, restricted admin roles and the records that
+     * belong to them. Operator console commands (setup, the root admin
+     * command) skip the check; other console work does not. Scheduled tasks
+     * that run as another admin are checked when they are saved.
      *
      * @return void
      */
@@ -50,8 +51,13 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
     {
         foreach (['saving' => false, 'deleting' => true] as $event => $deleting) {
             Event::listen("eloquent.$event: *", function ($name, array $data) use ($deleting) {
-                if (($data[0] ?? null) instanceof User && !AdminUser::isOperatorConsole()) {
-                    AdminUser::authorizeChange($data[0], $deleting);
+                $model = $data[0] ?? null;
+                if ($model instanceof User) {
+                    if (!AdminUser::isOperatorConsole()) {
+                        AdminUser::authorizeChange($model, $deleting);
+                    }
+                } elseif (AdminUser::isAdminRelatedModel($model) && !AdminUser::isOperatorConsole()) {
+                    AdminUser::authorizeRelatedChange($model);
                 }
             });
         }

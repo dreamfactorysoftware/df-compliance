@@ -63,7 +63,7 @@ class ServiceLevelAuditingTest extends TestCase
             return (new Route('POST', 'api/{version}/{service}/{resource?}', []))->bind($rq);
         });
         $response = Mockery::mock('Illuminate\Http\Response')->shouldReceive('getOriginalContent')->once()->andReturn('blah')->getMock();
-        $response->shouldReceive('status')->once()->andReturn('blah');
+        $response->shouldReceive('status')->once()->andReturn(200);
         $middleware = new ServiceLevelAudit();
         $middleware->handle($rq, function () use ($response) {
             return $response;

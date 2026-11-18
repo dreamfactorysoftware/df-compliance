@@ -37,6 +37,8 @@ class RootAdminTest extends TestCase
         $loginData = ['email' => $this->adminData['email'], 'password' => $this->adminData['password'], 'remember_me' => false];
 
         $rootAdminUser = AdminUser::create($this->adminData);
+        $rootAdminUser->is_root_admin = true;
+        $rootAdminUser->save();
         Session::setUserInfoWithJWT($rootAdminUser);
         $token = JWTUtilities::makeJWTByUser($rootAdminUser->id, $rootAdminUser->email);
         $apiKey = App::find(1)->api_key;

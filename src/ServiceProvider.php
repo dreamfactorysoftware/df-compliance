@@ -39,8 +39,9 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
     }
 
     /**
-     * Guard admin accounts at the model, not the URL. The console (setup,
-     * root admin command) is trusted and skips the guard.
+     * Check admin account changes on the model, not only on the URL. Operator
+     * console commands (setup, the root admin command) skip the check;
+     * scheduled tasks and other console work do not.
      *
      * @return void
      */
@@ -48,7 +49,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
     {
         foreach (['saving' => false, 'deleting' => true] as $event => $deleting) {
             Event::listen("eloquent.$event: *", function ($name, array $data) use ($deleting) {
-                if (($data[0] ?? null) instanceof User && !$this->app->runningInConsole()) {
+                if (($data[0] ?? null) instanceof User && !AdminUser::isOperatorConsole()) {
                     AdminUser::authorizeChange($data[0], $deleting);
                 }
             });

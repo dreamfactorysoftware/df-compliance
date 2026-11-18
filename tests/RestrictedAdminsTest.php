@@ -68,6 +68,10 @@ class RestrictedAdminsTest extends TestCase
 
     public function tearDown(): void
     {
+        AdminUser::setConsoleCommand(false);
+        Session::flush();
+        \DreamFactory\Core\Models\User::resetAdminExists();
+        \DreamFactory\Core\Models\User::whereIn('email', ['task-admin@dreamfactory.com', 'two-step@dreamfactory.com', 'plain-user@dreamfactory.com'])->delete();
         AdminUser::whereEmail('jdoe@dreamfactory.com')->delete();
         AdminUser::whereEmail('jdoeRA@dreamfactory.com')->delete();
         AdminUser::whereEmail('jdoeNonRoot@dreamfactory.com')->delete();
@@ -259,6 +263,168 @@ class RestrictedAdminsTest extends TestCase
         $this->assertFalse($denied(function () use ($other) {
             AdminUser::authorizeChange($other->fresh(), true);
         }), 'root could not delete an admin');
+    }
+
+    /**
+     * With no session user, only sign-in and password fields may change on an
+     * admin, and nothing may create an admin or change the admin flags.
+     */
+    public function testModelGuardWithoutSessionUser()
+    {
+        $this->makeAdmin($this->rootAdminData, true);
+        $other = $this->makeAdmin($this->raAdminData);
+        Session::flush();
+
+        $this->assertTrue($this->refused(function () {
+            $user = new \DreamFactory\Core\Models\User();
+            $user->is_sys_admin = true;
+            AdminUser::authorizeChange($user);
+        }), 'admin created without a session user');
+        $this->assertTrue($this->refused(function () use ($other) {
+            $self = $other->fresh();
+            $self->is_sys_admin = false;
+            AdminUser::authorizeChange($self);
+        }), 'admin flag changed without a session user');
+        $this->assertTrue($this->refused(function () use ($other) {
+            $self = $other->fresh();
+            $self->first_name = 'changed';
+            AdminUser::authorizeChange($self);
+        }), 'admin profile changed without a session user');
+        $this->assertTrue($this->refused(function () use ($other) {
+            AdminUser::authorizeChange($other->fresh(), true);
+        }), 'admin deleted without a session user');
+        $this->assertFalse($this->refused(function () use ($other) {
+            $self = $other->fresh();
+            $self->last_login_date = date('Y-m-d H:i:s');
+            $self->confirm_code = null;
+            $self->password = 'another-password-1234';
+            AdminUser::authorizeChange($self);
+        }), 'sign-in or password fields refused without a session user');
+    }
+
+    /**
+     * Sign-in fields may change on another admin even while a different,
+     * non-root user is signed in (signing in again with another account).
+     */
+    public function testModelGuardAllowsSignInFieldsForAnyCaller()
+    {
+        $this->makeAdmin($this->rootAdminData, true);
+        $nonRoot = $this->makeAdmin($this->nonRootAdminData);
+        $other = $this->makeAdmin($this->raAdminData);
+        Session::setUserInfoWithJWT($nonRoot);
+
+        $this->assertFalse($this->refused(function () use ($other) {
+            $self = $other->fresh();
+            $self->last_login_date = date('Y-m-d H:i:s');
+            AdminUser::authorizeChange($self);
+        }), 'sign-in fields refused');
+        $this->assertTrue($this->refused(function () use ($other) {
+            $self = $other->fresh();
+            $self->password = 'another-password-1234';
+            AdminUser::authorizeChange($self);
+        }), 'non-root changed another admin password');
+    }
+
+    /**
+     * The first admin of a new install is saved twice: created (and marked
+     * root because no admin exists yet), then given admin rights. Both saves
+     * run with the model check active.
+     */
+    public function testFirstAdminCanBeCreatedWithModelCheckActive()
+    {
+        // Start from an install with no admins; the transaction restores the
+        // database afterwards.
+        \DB::beginTransaction();
+        try {
+            \DreamFactory\Core\Models\User::query()->update(['is_sys_admin' => 0, 'is_root_admin' => 0]);
+            Session::flush();
+            \DreamFactory\Core\Models\User::resetAdminExists();
+            AdminUser::setConsoleCommand('queue:work');
+
+            $user = \DreamFactory\Core\Models\User::create([
+                'name'       => 'First Admin',
+                'first_name' => 'First',
+                'last_name'  => 'Admin',
+                'email'      => 'first-admin@dreamfactory.com',
+                'is_active'  => 1,
+            ]);
+            $user->password = 'first-admin-password-1234';
+            $user->is_sys_admin = 1;
+            $user->save();
+
+            $saved = AdminUser::whereEmail('first-admin@dreamfactory.com')->first();
+            $this->assertTrue((bool)$saved->is_sys_admin, 'first admin has no admin rights');
+            $this->assertTrue((bool)$saved->is_root_admin, 'first admin is not root');
+        } finally {
+            \DB::rollBack();
+        }
+    }
+
+    /**
+     * Scheduled tasks and other console work are checked like web requests.
+     * Operator commands and the test runner are not.
+     */
+    public function testConsoleCommandsOtherThanOperatorCommandsAreChecked()
+    {
+        $this->makeAdmin($this->rootAdminData, true);
+        $nonRoot = $this->makeAdmin($this->nonRootAdminData);
+        $other = $this->makeAdmin($this->raAdminData);
+
+        AdminUser::setConsoleCommand(null);
+        $this->assertTrue(AdminUser::isOperatorConsole());
+        AdminUser::setConsoleCommand('df:root_admin');
+        $this->assertTrue(AdminUser::isOperatorConsole());
+        AdminUser::setConsoleCommand('df:scheduled-request');
+        $this->assertFalse(AdminUser::isOperatorConsole());
+
+        Session::setUserInfoWithJWT($nonRoot);
+        $this->assertTrue($this->refused(function () use ($other) {
+            $other->fresh()->delete();
+        }), 'scheduled task deleted an admin as non-root');
+        $this->assertTrue(AdminUser::adminExistsById($other->id));
+
+        Session::flush();
+        $this->assertTrue($this->refused(function () {
+            $user = new \DreamFactory\Core\Models\User(['name' => 'Task Admin', 'email' => 'task-admin@dreamfactory.com']);
+            $user->is_sys_admin = true;
+            $user->save();
+        }), 'scheduled task created an admin without a session user');
+        $this->assertFalse(\DreamFactory\Core\Models\User::whereEmail('task-admin@dreamfactory.com')->exists());
+    }
+
+    /**
+     * An admin create that is refused at the second save leaves no user
+     * behind.
+     */
+    public function testRefusedAdminCreateLeavesNoUser()
+    {
+        $this->makeAdmin($this->rootAdminData, true);
+        $nonRoot = $this->makeAdmin($this->nonRootAdminData);
+        AdminUser::setConsoleCommand('df:scheduled-request');
+        Session::setUserInfoWithJWT($nonRoot);
+
+        $this->assertTrue($this->refused(function () {
+            $user = \DreamFactory\Core\Models\User::create(['name' => 'Two Step', 'email' => 'two-step@dreamfactory.com']);
+            $user->is_sys_admin = 1;
+            $user->save();
+        }), 'non-root created an admin');
+        $this->assertFalse(\DreamFactory\Core\Models\User::whereEmail('two-step@dreamfactory.com')->exists());
+
+        $this->assertFalse($this->refused(function () {
+            \DreamFactory\Core\Models\User::create(['name' => 'Plain User', 'email' => 'plain-user@dreamfactory.com']);
+        }), 'non-root could not create an ordinary user');
+        $this->assertTrue(\DreamFactory\Core\Models\User::whereEmail('plain-user@dreamfactory.com')->exists());
+    }
+
+    private function refused(callable $change)
+    {
+        try {
+            $change();
+        } catch (ForbiddenException $e) {
+            return true;
+        }
+
+        return false;
     }
 
     private function makeAdmin(array $data, $root = false)

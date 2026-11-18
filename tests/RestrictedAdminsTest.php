@@ -184,10 +184,9 @@ class RestrictedAdminsTest extends TestCase
     }
 
     /**
-     * The path match must not depend on the Host header, letter case or
-     * percent-encoding. Each of these URLs reaches the admin resource.
+     * Admin paths are matched in canonical form.
      */
-    public function testAdminPathMatchIgnoresHostCaseAndEncoding()
+    public function testAdminPathsAreMatchedInCanonicalForm()
     {
         $nonRootAdmin = $this->makeAdmin($this->nonRootAdminData);
         Session::setUserInfoWithJWT($nonRootAdmin);

@@ -41,7 +41,8 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
     /**
      * Check admin account changes on the model, not only on the URL. Operator
      * console commands (setup, the root admin command) skip the check;
-     * scheduled tasks and other console work do not.
+     * other console work does not. Scheduled tasks that run as another
+     * admin are checked when they are saved.
      *
      * @return void
      */
@@ -54,6 +55,13 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
                 }
             });
         }
+
+        // A scheduled task can run as a chosen user (df-scheduler run-as).
+        Event::listen('eloquent.saving: ' . AdminUser::SCHEDULER_TASK_MODEL, function ($task) {
+            if (!AdminUser::isOperatorConsole()) {
+                AdminUser::authorizeRunAs($task);
+            }
+        });
     }
 
     public function register(){

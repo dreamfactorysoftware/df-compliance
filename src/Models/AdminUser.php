@@ -73,6 +73,12 @@ class AdminUser extends CoreAdminUser
     const NO_SESSION_FIELDS = ['last_login_date', 'confirm_code', 'password', 'remember_token'];
 
     /**
+     * df-scheduler task model. Referenced by name so the package works
+     * without df-scheduler installed.
+     */
+    const SCHEDULER_TASK_MODEL = 'DreamFactory\\Core\\Scheduler\\Models\\SchedulerTask';
+
+    /**
      * Name of the artisan command this process runs. False until resolved,
      * null when the process is not an artisan command.
      *
@@ -133,6 +139,34 @@ class AdminUser extends CoreAdminUser
         }
 
         throw new ForbiddenException('Only root admin can manage admins.');
+    }
+
+    /**
+     * A scheduled task runs with the session of its user_id. Only a root
+     * admin may save a task that runs as an admin other than themselves.
+     * Tasks that run as the caller, as an ordinary user, or with no user
+     * are not affected.
+     *
+     * @param \Illuminate\Database\Eloquent\Model $task
+     *
+     * @throws ForbiddenException
+     */
+    public static function authorizeRunAs($task)
+    {
+        $userId = $task->getAttribute('user_id');
+        if (empty($userId) || !static::doesSysAdminRootExist()) {
+            return;
+        }
+
+        $callerId = Session::getCurrentUserId();
+        if ($callerId && ($callerId == $userId || static::isRootById($callerId))) {
+            return;
+        }
+        if (!static::adminExistsById($userId)) {
+            return;
+        }
+
+        throw new ForbiddenException('Only root admin can schedule tasks that run as another admin.');
     }
 
     /**

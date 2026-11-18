@@ -416,6 +416,76 @@ class RestrictedAdminsTest extends TestCase
         $this->assertTrue(\DreamFactory\Core\Models\User::whereEmail('plain-user@dreamfactory.com')->exists());
     }
 
+    /**
+     * Only a root admin may save a scheduled task that runs as another
+     * admin. Tasks that run as the caller or as an ordinary user are not
+     * affected.
+     */
+    public function testScheduledTaskRunningAsAnotherAdminNeedsRoot()
+    {
+        $taskClass = AdminUser::SCHEDULER_TASK_MODEL;
+        if (!class_exists($taskClass)) {
+            $this->markTestSkipped('df-scheduler is not installed.');
+        }
+
+        $root = $this->makeAdmin($this->rootAdminData, true);
+        $nonRoot = $this->makeAdmin($this->nonRootAdminData);
+        $other = $this->makeAdmin($this->raAdminData);
+        $plain = \DreamFactory\Core\Models\User::create(['name' => 'Plain User', 'email' => 'plain-user@dreamfactory.com']);
+        AdminUser::setConsoleCommand('queue:work');
+
+        \DB::beginTransaction();
+        try {
+            $task = function ($userId) use ($taskClass) {
+                return new $taskClass([
+                    'name'       => 'run-as-' . $userId . '-' . uniqid(),
+                    'service_id' => \DreamFactory\Core\Models\Service::query()->value('id'),
+                    'app_id'     => App::query()->value('id'),
+                    'user_id'    => $userId,
+                    'component'  => 'admin',
+                    'verb_mask'  => 1,
+                    'frequency'  => 5,
+                ]);
+            };
+
+            Session::setUserInfoWithJWT($nonRoot);
+            foreach ([$root->id, $other->id] as $userId) {
+                $this->assertTrue($this->refused(function () use ($task, $userId) {
+                    $task($userId)->save();
+                }), 'non-root saved a task that runs as admin ' . $userId);
+            }
+            foreach ([$nonRoot->id, $plain->id, null] as $userId) {
+                $this->assertFalse($this->refused(function () use ($task, $userId) {
+                    $task($userId)->save();
+                }), 'non-root could not save a task that runs as ' . var_export($userId, true));
+            }
+
+            Session::setUserInfoWithJWT($root);
+            $saved = $task($root->id);
+            $this->assertFalse($this->refused(function () use ($saved) {
+                $saved->save();
+            }), 'root could not save a task that runs as root');
+
+            Session::setUserInfoWithJWT($nonRoot);
+            $this->assertTrue($this->refused(function () use ($saved) {
+                $saved->fresh()->update(['component' => 'admin/1']);
+            }), 'non-root changed a task that runs as root');
+            $this->assertTrue($this->refused(function () use ($saved, $root) {
+                $mine = $saved->fresh();
+                $mine->user_id = $root->id;
+                $mine->name = 'renamed';
+                $mine->save();
+            }), 'non-root renamed a task that runs as root');
+
+            Session::flush();
+            $this->assertTrue($this->refused(function () use ($task, $root) {
+                $task($root->id)->save();
+            }), 'task that runs as root saved without a session user');
+        } finally {
+            \DB::rollBack();
+        }
+    }
+
     private function refused(callable $change)
     {
         try {

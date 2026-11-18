@@ -133,7 +133,7 @@ class RestrictedAdminsTest extends TestCase
         $this->assertEquals('You do not have permission to modify restricted admin roles. Please contact your root administrator.', $response->json('error.message'));
 
         Session::setUserInfoWithJWT($nonRootAdmin);
-        $response = $this->patch('/api/v2/system/role', ['resource' => [['id' => $role->id, 'description' => 'changed']]]);
+        $response = $this->json('PATCH', '/api/v2/system/role', ['resource' => [['id' => $role->id, 'description' => 'changed']]]);
         $response->assertStatus(403);
         $this->assertEquals('You do not have permission to modify restricted admin roles. Please contact your root administrator.', $response->json('error.message'));
 

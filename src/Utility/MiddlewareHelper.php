@@ -308,10 +308,15 @@ class MiddlewareHelper
             if (static::isCurrentRequest($request)) {
                 $payload = (new ServiceRequest())->getPayloadData();
             } else {
-                // A request that is not the one being served (e.g. built by a test)
-                $content = (string)$request->getContent();
-                $isJson = $request->isJson() || ('' !== $content && null !== json_decode($content));
-                $payload = $isJson ? $request->json()->all() : $request->input();
+                // A request that is not the one being served
+                // (e.g. built by a test). Its content may be unset or not a string.
+                $content = $request->getContent();
+                if (!is_string($content) || '' === $content) {
+                    $payload = $request->input();
+                } else {
+                    $isJson = $request->isJson() || null !== json_decode($content);
+                    $payload = $isJson ? $request->json()->all() : $request->input();
+                }
             }
         } catch (\Throwable $e) {
             return [];

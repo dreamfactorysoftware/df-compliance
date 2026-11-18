@@ -23,11 +23,18 @@ class DoesRootAdminExist
         $this->request = $request;
         $response = $next($request);
 
-        if (!$this->isEnvironmentRequest()) {
+        if (!$this->isEnvironmentRequest() || !method_exists($response, 'getOriginalContent')) {
             return $response;
         }
 
         $content = $response->getOriginalContent();
+        if (!is_array($content) || isset($content['error'])) {
+            return $response;
+        }
+
+        if (!isset($content['platform']) || !is_array($content['platform'])) {
+            $content['platform'] = [];
+        }
         $content['platform']['root_admin_exists'] = AdminUser::doesRootAdminExist();
         $response->setContent($content);
 
@@ -35,12 +42,12 @@ class DoesRootAdminExist
     }
 
     /**
-     * Does request go to admin/session
+     * Does request go to system/environment
      *
      * @return bool
      */
     private function isEnvironmentRequest()
     {
-        return MiddlewareHelper::requestUrlContains($this->request, 'environment');
+        return MiddlewareHelper::isRoutedTo($this->request, 'system', 'environment');
     }
 }

@@ -32,10 +32,12 @@ class AccessibleTabs
         $response = $next($this->request);
         $method = $this->request->getMethod();
 
-        if ($this->isGetAccessibleTabsRequest($method)) {
-            $content = $this->getContentWithAccessibleTabs($response->getOriginalContent());
-            $response->setContent($content);
-        };
+        if ($this->isGetAccessibleTabsRequest($method) && method_exists($response, 'getOriginalContent')) {
+            $content = $response->getOriginalContent();
+            if (is_array($content)) {
+                $response->setContent($this->getContentWithAccessibleTabs($content));
+            }
+        }
 
         return $response;
     }
@@ -47,7 +49,7 @@ class AccessibleTabs
     private function isGetAccessibleTabsRequest($method)
     {
         return $method === Verbs::GET &&
-            MiddlewareHelper::requestUrlContains($this->request, 'system/role') &&
+            MiddlewareHelper::isRoutedTo($this->request, 'system', 'role') &&
             self::isAccessibleTabsSpecified($this->request->only('accessible_tabs'));
     }
 
@@ -57,7 +59,7 @@ class AccessibleTabs
      */
     private function getContentWithAccessibleTabs($rolesInfo)
     {
-        if (isset($rolesInfo['resource'])) {
+        if (isset($rolesInfo['resource']) && is_array($rolesInfo['resource'])) {
             foreach ($rolesInfo['resource'] as $key => $item) {
                 $rolesInfo['resource'][$key] = self::addAccessibleTabs($item);
             }
@@ -82,8 +84,8 @@ class AccessibleTabs
      */
     private static function addAccessibleTabs($roleInfo)
     {
-        if(!isset($roleInfo['error'])) {
-            $roleInfo['accessible_tabs'] = RestrictedAdmin::getAccessibleTabsByRoleId($roleInfo["id"]);
+        if (is_array($roleInfo) && !isset($roleInfo['error']) && isset($roleInfo['id'])) {
+            $roleInfo['accessible_tabs'] = RestrictedAdmin::getAccessibleTabsByRoleId($roleInfo['id']);
         }
 
         return $roleInfo;

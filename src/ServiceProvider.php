@@ -14,6 +14,8 @@ use DreamFactory\Core\Compliance\Http\Middleware\DoesRootAdminExist;
 use DreamFactory\Core\Compliance\Http\Middleware\HandleRestrictedAdminRole;
 use DreamFactory\Core\Compliance\Http\Middleware\MarkAsRootAdmin;
 use DreamFactory\Core\Compliance\Http\Middleware\ServiceLevelAudit;
+use DreamFactory\Core\Compliance\Models\AdminUser;
+use DreamFactory\Core\Models\User;
 use Illuminate\Routing\Router;
 
 use Route;
@@ -33,6 +35,39 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
 
         $this->addMiddleware();
         $this->addCommands();
+        $this->addAdminGuard();
+    }
+
+    /**
+     * Check admin account changes on the model, not only on the URL. This
+     * covers admin accounts, restricted admin roles and the records that
+     * belong to them. Operator console commands (setup, the root admin
+     * command) skip the check; other console work does not. Scheduled tasks
+     * that run as another admin are checked when they are saved.
+     *
+     * @return void
+     */
+    protected function addAdminGuard()
+    {
+        foreach (['saving' => false, 'deleting' => true] as $event => $deleting) {
+            Event::listen("eloquent.$event: *", function ($name, array $data) use ($deleting) {
+                $model = $data[0] ?? null;
+                if ($model instanceof User) {
+                    if (!AdminUser::isOperatorConsole()) {
+                        AdminUser::authorizeChange($model, $deleting);
+                    }
+                } elseif (AdminUser::isAdminRelatedModel($model) && !AdminUser::isOperatorConsole()) {
+                    AdminUser::authorizeRelatedChange($model);
+                }
+            });
+        }
+
+        // A scheduled task can run as a chosen user (df-scheduler run-as).
+        Event::listen('eloquent.saving: ' . AdminUser::SCHEDULER_TASK_MODEL, function ($task) {
+            if (!AdminUser::isOperatorConsole()) {
+                AdminUser::authorizeRunAs($task);
+            }
+        });
     }
 
     public function register(){
